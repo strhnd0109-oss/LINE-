@@ -160,13 +160,12 @@ def callback():
                 answer
             )
 
-        except Exception as e:
-            print("ERROR:", e)
-
-            reply_to_line(
-                reply_token,
-                "ごめんね。少し処理に問題が起きたみたいだ。"
-            )
+   　　　 except Exception as e:
+    print("ERROR:", repr(e))
+    reply_to_line(
+        reply_token,
+        f"エラーが発生したよ。\n{type(e).__name__}: {e}"
+    )
 
     return "OK"
 
