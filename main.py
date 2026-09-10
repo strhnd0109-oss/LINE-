@@ -177,6 +177,7 @@ def callback():
                     "キュッ!"
                     "…………………"
                     "……"
+                    "キュップィ"
                 ]
 
                 message = random.choice(sounds)
