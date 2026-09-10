@@ -42,7 +42,8 @@ SYSTEM_INSTRUCTION = """
 現実世界で危険なことをするよう勧めたり、
 個人情報や秘密の情報を要求したりしないでください。
 
-以下の彼のセリフを参考にしてください
+以下、彼が発した言葉を貼ります。参考にしてください。
+
 二人とも！　今すぐ僕と契約を！まどか！さやか！願い事を決めるんだ、早く！
 
 僕たちはあくまで君たちの合意を前提に契約しているんだよ？それだけでも充分に良心的なはずなんだが…
@@ -164,10 +165,17 @@ def callback():
         except Exception as e:
             print("ERROR:", repr(e))
 
-            reply_to_line(
-                reply_token,
-                f"エラーが発生したよ。\n{type(e).__name__}: {e}"
-            )
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                message = (
+                    "どうやら、現在の僕は一時的に活動できる範囲を超えてしまったようだ。\n"
+                    "心配はいらないよ。時間が経てば、再び応答できるようになる。"
+                )
+            else:
+                message = (
+                    "ごめんね。少し処理に問題が起きたみたいだ。"
+                )
+
+            reply_to_line(reply_token, message)
 
     return "OK"
 
