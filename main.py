@@ -2,6 +2,7 @@ import os
 import hmac
 import hashlib
 import base64
+import random
 
 import requests
 from flask import Flask, request, abort
@@ -42,7 +43,7 @@ SYSTEM_INSTRUCTION = """
 現実世界で危険なことをするよう勧めたり、
 個人情報や秘密の情報を要求したりしないでください。
 
-以下、彼が発した言葉を貼ります。参考にしてください。
+以下はキュゥべえの発言です。参考にしてください。
 
 二人とも！　今すぐ僕と契約を！まどか！さやか！願い事を決めるんだ、早く！
 
@@ -166,10 +167,20 @@ def callback():
             print("ERROR:", repr(e))
 
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                message = (
-                    "どうやら、現在の僕は一時的に活動できる範囲を超えてしまったようだ。\n"
-                    "心配はいらないよ。時間が経てば、再び応答できるようになる。"
-                )
+                sounds = [
+                    "キュゥン…",
+                    "キュッベェ",
+                    "キュゥ……ベェ……",
+                    "キュベェ!",
+                    "キュゥ……キュゥ……",
+                    "キュベェ……キュゥ……"
+                    "キュッ!"
+                    "…………………"
+                    "……"
+                ]
+
+                message = random.choice(sounds)
+
             else:
                 message = (
                     "ごめんね。少し処理に問題が起きたみたいだ。"
