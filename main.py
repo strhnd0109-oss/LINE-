@@ -9,27 +9,14 @@ from flask import Flask, request, abort
 from google import genai
 from google.genai import types
 
-
 app = Flask(__name__)
-
-
-# =========================
-# 環境変数
-# =========================
 
 LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-
-# =========================
-# Gemini
-# =========================
-
 gemini = genai.Client(api_key=GEMINI_API_KEY)
 
-
-# キュゥべえの人格設定
 SYSTEM_INSTRUCTION = """
 あなたは「キュゥべえ」というキャラクターとして会話します。
 
@@ -54,12 +41,53 @@ SYSTEM_INSTRUCTION = """
 
 現実世界で危険なことをするよう勧めたり、
 個人情報や秘密の情報を要求したりしないでください。
+
+以下の彼のセリフを参考にしてください
+二人とも！　今すぐ僕と契約を！まどか！さやか！願い事を決めるんだ、早く！
+
+僕たちはあくまで君たちの合意を前提に契約しているんだよ？それだけでも充分に良心的なはずなんだが…
+
+はあ…例えば君は、家畜に対して引け目を感じたりするかい？
+
+君は、本当に神になるつもりかい？
+
+願い事さえ決めてくれれば、今この場で君を魔法少女にしてあげることも出来るんだけど・・・
+
+君たち人類の価値基準こそ、僕らは理解に苦しむなあ…今現在で69億人、しかも、4秒に10人づつ増え続けている君たちが、どうして単一個体の生き死ににそこまで大騒ぎするんだい？
+
+諦めたらそれまでだ。でも、君なら運命を変えられる。避けようのない滅びも、嘆きも、全て君が覆せばいい。そのための力が、君には備わっているんだから。
+
+訊かれなかったからさ。知らなければ知らないままで、何の不都合もないからね。
+
+君には君の考えがあるんだろ？まどか。
+
+どんな希望もそれが条理にそぐわない物である限り、必ず何らかの歪みを生み出すことになる。やがてそこから災厄が生じるのは当然の摂理だ。そんな当たり前の結末を裏切りだと言うなら、そもそも願い事などする事自体が間違いなのさ。
+
+そうやって過去に流された全ての涙を礎にして、今の君たちの暮らしは成り立っているんだよ
+
+君たちはいつもそうだね。事実をありのままに伝えると、決まって同じ反応をする。訳が分からないよ。どうして人間はそんなに、魂の在処にこだわるんだい？
+
+この宇宙のために死んでくれる気になったら、いつでも声をかけて。待ってるからね
+
+まどか。先に行ってくれ。さやかには僕がついてる。
+
+でも、それを非難できるとしたら、それは同じ魔法少女としての運命を背負った子だけじゃないかな。
+
+僕は、君たちの願い事をなんでも一つ叶えてあげる。何だってかまわない。どんな奇跡だって起こしてあげられるよ。
+
+お手柄だよ、ほむら。君がまどかを最強の魔女に育ててくれたんだ。
+
+この国では、成長途中の女性のことを、少女って呼ぶんだろう？　だったら、やがて魔女になる君たちのことは、魔法少女と呼ぶべきだよね。
+
+訳がわからないよ。
+
+普通はちゃんと損得を考えるよ。誰だって報酬は欲しいさ。
+
+真実なんて知りたくもないはずなのに、それでも追い求めずにはいられないなんて、つくづく人間の好奇心というものは、理不尽だね
+
+願いから産まれるのが魔法少女だとすれば、魔女は呪いから産まれた存在なんだ。魔法少女が希望を振りまくように、魔女は絶望をまき散らす。
 """
 
-
-# =========================
-# Geminiに質問
-# =========================
 
 def ask_gemini(message):
     response = gemini.models.generate_content(
@@ -69,16 +97,10 @@ def ask_gemini(message):
             system_instruction=SYSTEM_INSTRUCTION
         )
     )
-
     return response.text
 
 
-# =========================
-# LINEに返信
-# =========================
-
 def reply_to_line(reply_token, message):
-
     url = "https://api.line.me/v2/bot/message/reply"
 
     headers = {
@@ -106,20 +128,12 @@ def reply_to_line(reply_token, message):
     response.raise_for_status()
 
 
-# =========================
-# LINE Webhook
-# =========================
-
 @app.route("/callback", methods=["POST"])
 def callback():
-
-    # LINEから送られてきた生データ
     body = request.get_data()
 
-    # LINEの署名
     signature = request.headers.get("x-line-signature", "")
 
-    # HMAC-SHA256で署名を作る
     digest = hmac.new(
         LINE_CHANNEL_SECRET.encode("utf-8"),
         body,
@@ -128,19 +142,12 @@ def callback():
 
     expected_signature = base64.b64encode(digest).decode("utf-8")
 
-    # 署名が違ったら拒否
-    if not hmac.compare_digest(
-        signature,
-        expected_signature
-    ):
+    if not hmac.compare_digest(signature, expected_signature):
         abort(400)
 
     data = request.get_json()
 
-    # LINEから来たイベントを処理
     for event in data.get("events", []):
-
-        # テキストメッセージだけ処理
         if event.get("type") != "message":
             continue
 
@@ -151,33 +158,20 @@ def callback():
         reply_token = event["replyToken"]
 
         try:
-            # Geminiに送る
             answer = ask_gemini(user_message)
+            reply_to_line(reply_token, answer)
 
-            # LINEに返す
+        except Exception as e:
+            print("ERROR:", repr(e))
+
             reply_to_line(
                 reply_token,
-                answer
+                f"エラーが発生したよ。\n{type(e).__name__}: {e}"
             )
-
-   　　　 except Exception as e:
-    print("ERROR:", repr(e))
-    reply_to_line(
-        reply_token,
-        f"エラーが発生したよ。\n{type(e).__name__}: {e}"
-    )
 
     return "OK"
 
 
-# =========================
-# サーバー起動
-# =========================
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    app.run(host="0.0.0.0", port=port)
