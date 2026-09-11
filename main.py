@@ -166,23 +166,21 @@ def callback():
         except Exception as e:
             print("ERROR:", repr(e))
 
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                sounds = [
-                    "キュゥン…",
-                    "キュッベェ",
-                    "キュゥ……ベェ……",
-                    "キュベェ!",
-                    "キュゥ……キュゥ……",
-                    "キュベェ……キュゥ……",
-                    "キュッ!",
-                    "…………………",
-                    "……",
-                    "キュップィ",
-                    "訳がわからないよ",
-                ]
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "503" in str(e) or "UNAVAILABLE" in str(e):
+    sounds = [
+        "キュゥン…",
+        "キュッベェ",
+        "キュゥ……ベェ……",
+        "キュベェ!",
+        "キュゥ……キュゥ……",
+        "キュベェ……キュゥ……",
+        "キュッ!",
+        "…………………",
+        "……",
+        "キュップィ"
+    ]
 
-                message = random.choice(sounds)
-
+    message = random.choice(sounds)
             else:
                 message = (
                     "ごめんね。少し処理に問題が起きたみたいだ。"
