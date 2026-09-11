@@ -178,6 +178,7 @@ def callback():
                     "…………………",
                     "……",
                     "キュップィ",
+                    "訳がわからないよ",
                 ]
 
                 message = random.choice(sounds)
