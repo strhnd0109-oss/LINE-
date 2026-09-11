@@ -181,7 +181,7 @@ def callback():
     message = random.choice(sounds)
             else:
                 message = (
-                    "ごめんね。少し処理に問題が起きたみたいだ。"
+                    "わけがわからないよ"
                 )
 
             reply_to_line(reply_token, message)
