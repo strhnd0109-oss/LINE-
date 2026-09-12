@@ -160,7 +160,7 @@ def callback():
             answer = ask_gemini(user_message)
             reply_to_line(reply_token, answer)
 
-                except Exception as e:
+        except Exception as e:
             print("ERROR:", repr(e))
 
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "503" in str(e) or "UNAVAILABLE" in str(e):
