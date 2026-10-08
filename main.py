@@ -123,7 +123,8 @@ def callback():
                     "……",
                     "ォォミャーン",
                     "うおw",
-                    "きちぃ〜w"
+                    "きちぃ〜w",
+                    "𒅒",
                 ]
 
                 message = random.choice(sounds)
