@@ -152,7 +152,7 @@ def callback():
             elif command == "日程を見せて":
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
 
-            elif command in ("あなたは誰?", "君は誰", "誰なの"):
+            elif command == "あなたは誰?":
                 reply_text(
                     reply_token,
                     "僕はオオやん。"
