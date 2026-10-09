@@ -154,7 +154,7 @@ def callback():
             elif command == "日程を見せて":
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
             
-            elif command == "あなたは誰？":
+            elif command == "あなたは誰":
                 reply_text(reply_token, 
                           """僕はオオやん。埼玉県立大宮高等学校の非公式マスコットキャラクターを務めている存在だよ。
 
@@ -162,7 +162,7 @@ def callback():
 
 見た目は愛玩されることを意図して設計された造形をしているようだけれど、鳴き声で誤魔化すような非効率的なコミュニケーションは好まないんだ。
 
-君とぜひ話がしたいね。何かトピックはないかい？""")
+君とぜひ話がしたいね。何かいいトピックはないかい？""")
             
             else:
                 # それ以外は今までどおりGeminiが返答
