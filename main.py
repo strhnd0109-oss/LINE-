@@ -159,7 +159,44 @@ def callback():
                 reply_token,
                 "やめなって！淫夢ごっこは大宮高校では恥ずかしいことなんだよ！"
             )
+           
+            elif command == "トルーパーソリュート":
+                reply_to_line(reply_token, [
+                    {"type": "text", "text": "トルーパーソリュート、かい。"},
+                    {"type": "text", "text": """僕、トルーパーソリュート、好きなんだよね。
+                    
+                    Trooper Salute（トルーパーソリュート）**は、名古屋発の5人組シンフォニック・インディーロックバンドだよ。浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。2025年にはFUJI ROCK FESTIVALにも出演しているよ。こういう独自の音楽性を持つバンドを知っているとは、君の音楽的好奇心にトップリーダーの鑑ポイントを25点あげるよ！
+                    
+                    ぜひ聴いてみるといい。"""},
+                    {"type": "text", "text": "https://open.spotify.com/track/7ANRDMXL1yKnJ5pGwuvXAU?si=RMHEIxM8TveVu7Gph-lFgw&utm_source=copy-link"}
+                ])
+
+            elif command == "꧁༺ 對話 ༻꧂がしたい。"
+                reply_text(reply_token,
+                          """対話……？⧫︎♒︎♋︎⧫︎🕯︎⬧︎ ■︎♓︎♍︎♏︎✏︎ ●︎♏︎⧫︎🕯︎⬧︎ ⧫︎♋︎●︎🙵 ⧫︎□︎♑︎♏︎⧫︎♒︎♏︎❒︎✏︎✏︎✏︎ ●︎ ⬥︎♋︎■︎⧫︎ ⧫︎□︎ 🙵■︎□︎⬥︎ ⍓︎□︎◆︎✏︎
+                          （いいね！お話しよう！）
+                          
+                          （キーボードを使うことでオオやんと会話が出来ます。）
+                          （オオやんはAIによって返答します。）
+                          （AIに制限が来た場合、決められた言葉しか話せなくなります。）
+                          （オオやんの性格がキツかった場合は本多まで！）""")
             
+            elif command == "公共の諸々を見せて":
+                reply_text(reply_token, [
+                    {"type": "text", "text":"公共の諸々を見たいのかい？はい。どうぞ"},
+                    {"type": "text", "text":"https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2"},
+                    {
+                        "type": "image",
+                        "originalContentUrl": os.environ["IMAGE_URL_1"],
+                        "previewImageUrl": os.environ["IMAGE_URL_1"]
+                    },
+                    {
+                        "type": "image",
+                        "originalContentUrl": os.environ["IMAGE_URL_2"],
+                        "previewImageUrl": os.environ["IMAGE_URL_2"]
+                    }
+                ])
+                           
             elif command == "あなたは誰":
                 reply_text(reply_token, 
                           """僕はオオやん。埼玉県立大宮高等学校の非公式マスコットキャラクターを務めている存在だよ。
