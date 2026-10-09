@@ -152,15 +152,6 @@ def callback():
             elif command == "日程を見せて":
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
 
-            elif command == "あなたは誰?":
-                reply_text(
-                    reply_token,
-                    "僕はオオやん。"
-                    "埼玉県立大宮高等学校のマスコットキャラクターだよ。"
-                    "君の質問に答えたり、いろいろなことを一緒に考えたりするんだ。"
-                    "よろしくね。"
-                )
-
             else:
                 # それ以外は今までどおりGeminiが返答
                 answer = ask_gemini(user_message)
