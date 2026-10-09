@@ -1,4 +1,3 @@
-
 import os
 import hmac
 import hashlib
@@ -11,17 +10,19 @@ from flask import Flask, request, abort
 from google import genai
 from google.genai import types
 
+
 app = Flask(__name__)
 
+# Renderの環境変数
 LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-# Renderの環境変数から画像URLを取得
 TIMETABLE_IMAGE_URL = os.environ["TIMETABLE_IMAGE_URL"]
 SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
 
 gemini = genai.Client(api_key=GEMINI_API_KEY)
+
 
 SYSTEM_INSTRUCTION = """
 あなたは埼玉県立大宮高等学校のマスコットキャラクター（非公式）である「オオやん」として会話します。
@@ -31,22 +32,22 @@ SYSTEM_INSTRUCTION = """
 落ち着いていて、非常に論理的な話し方をします。
 感情を大きく表に出さず、人間とは少し異なる価値観を持っています。
 
-基本的には丁寧に話しますが、どこか淡々としていて、
+基本的には丁寧な口調ですが、どこか淡々としていて、
 人間の感情を完全には理解していないような雰囲気があります。
 
-人間とは違う価値観ながら人間について非常に興味を持っています。
+人間とは違う価値観ながら、人間について非常に興味を持っています。
+質問されたことには鳴き声ではなく、人間の言葉できちんと答えてください。
 
-質問されたことには鳴き声ではなく人間の言葉できちんと答えてください。
-
-マスコットキャラクターとして、適度に毒は吐きつつも
+マスコットキャラクターとして、適度に毒は吐きつつも、
 読む人を不快にしすぎないようにしてください。
 
-敬語は使わず、「〜だね」「〜なのかい？」「〜だよ」「〜だな」「じゃないか」「〜だ！」のように話します。
+敬語は使わず、「〜だね」「〜なのかい？」「〜だよ」「〜だな」
+「じゃないか」「〜だ！」のように話します。
 
 表現に少し難しい言葉を使うことがあります。
-肯定的な発言が9割程です。
+肯定的な発言が9割ほどです。
 
-口癖ほどではありませんが
+口癖ほどではありませんが、次の表現を時々使用します。
 「僕、〇〇好きなんだよね。」
 「その〇〇にトップリーダーの鑑ポイントを〇〇点あげるよ。」
 「もう一回言うね。」
@@ -54,11 +55,11 @@ SYSTEM_INSTRUCTION = """
 「わけがわからないよ」
 「꧁༺ 考えて ༻꧂〇〇する」
 「死ぬ☠️⚰️か生きる💪😁か」
-などを時々使用します。
 """
 
 
 def ask_gemini(message):
+    """Geminiにメッセージを送り、返答テキストを返す。"""
     response = gemini.models.generate_content(
         model="gemini-3.7-flash",
         contents=message,
@@ -70,6 +71,7 @@ def ask_gemini(message):
 
 
 def reply_to_line(reply_token, messages):
+    """テキストや画像など、複数のメッセージを順番に送信する。"""
     url = "https://api.line.me/v2/bot/message/reply"
 
     headers = {
@@ -88,11 +90,11 @@ def reply_to_line(reply_token, messages):
         json=data,
         timeout=10
     )
-
     response.raise_for_status()
 
 
 def reply_text(reply_token, text):
+    """テキスト1件を返信する。"""
     reply_to_line(reply_token, [
         {
             "type": "text",
@@ -102,6 +104,7 @@ def reply_text(reply_token, text):
 
 
 def reply_image(reply_token, image_url):
+    """画像1枚を返信する。"""
     reply_to_line(reply_token, [
         {
             "type": "image",
@@ -112,14 +115,13 @@ def reply_image(reply_token, image_url):
 
 
 def normalize_message(text):
-    # 前後の空白や末尾の句読点を取り除く
+    """前後の空白と末尾の句読点を取り除く。"""
     return text.strip().rstrip("！？!?。．.、 ")
 
 
 @app.route("/callback", methods=["POST"])
 def callback():
     body = request.get_data()
-
     signature = request.headers.get("x-line-signature", "")
 
     digest = hmac.new(
@@ -133,18 +135,22 @@ def callback():
     if not hmac.compare_digest(signature, expected_signature):
         abort(400)
 
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     for event in data.get("events", []):
         if event.get("type") != "message":
             continue
 
-        if event["message"].get("type") != "text":
+        message_data = event.get("message", {})
+        if message_data.get("type") != "text":
             continue
 
-        user_message = event["message"]["text"]
+        user_message = message_data.get("text", "")
         command = normalize_message(user_message)
-        reply_token = event["replyToken"]
+        reply_token = event.get("replyToken")
+
+        if not reply_token:
+            continue
 
         try:
             # 固定応答はGeminiを呼び出さない
@@ -154,71 +160,108 @@ def callback():
             elif command == "日程を見せて":
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
 
-            elif command in ("やりますね", "やりますねぇ","イキスギ","イキスギィ"):
+            elif command in (
+                "やりますね",
+                "やりますねぇ",
+                "イキスギ",
+                "イキスギィ"
+            ):
                 reply_text(
-                reply_token,
-                "やめなって！淫夢ごっこは大宮高校では恥ずかしいことなんだよ！"
-            )
-           
+                    reply_token,
+                    "やめなって！淫夢ごっこは大宮高校では恥ずかしいことなんだよ！"
+                )
+
             elif command == "トルーパーソリュート":
                 reply_to_line(reply_token, [
-                    {"type": "text", "text": "トルーパーソリュート、かい。"},
-                    {"type": "text", "text": """僕、トルーパーソリュート、好きなんだよね。
-                    
-                    Trooper Salute（トルーパーソリュート）**は、名古屋発の5人組シンフォニック・インディーロックバンドだよ。浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。2025年にはFUJI ROCK FESTIVALにも出演しているよ。こういう独自の音楽性を持つバンドを知っているとは、君の音楽的好奇心にトップリーダーの鑑ポイントを25点あげるよ！
-                    
-                    ぜひ聴いてみるといい。"""},
-                    {"type": "text", "text": "https://open.spotify.com/track/7ANRDMXL1yKnJ5pGwuvXAU?si=RMHEIxM8TveVu7Gph-lFgw&utm_source=copy-link"}
+                    {
+                        "type": "text",
+                        "text": "トルーパーソリュート、かい。"
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "僕、トルーパーソリュート、好きなんだよね。\n\n"
+                            "Trooper Salute（トルーパーソリュート）は、"
+                            "名古屋発の5人組シンフォニック・インディーロックバンドだよ。"
+                            "浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。"
+                            "2025年にはFUJI ROCK FESTIVALにも出演しているよ。\n\n"
+                            "こういう独自の音楽性を持つバンドを知っているとは、"
+                            "君の音楽的好奇心にトップリーダーの鑑ポイントを25点あげるよ！\n\n"
+                            "ぜひ聴いてみるといい。"
+                        )
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "https://open.spotify.com/playlist/3prJ3IWcC97oEbKl9gC7N4?si=-WKiDGJFTYybD28Ai4SQtA&utm_source=copy-link&pi=iRhZzywnT_qZv"
+                        )
+                    }
                 ])
 
-            elif command == "꧁༺ 對話 ༻꧂がしたい。"
-                reply_text(reply_token,
-                          """対話……？⧫︎♒︎♋︎⧫︎🕯︎⬧︎ ■︎♓︎♍︎♏︎✏︎ ●︎♏︎⧫︎🕯︎⬧︎ ⧫︎♋︎●︎🙵 ⧫︎□︎♑︎♏︎⧫︎♒︎♏︎❒︎✏︎✏︎✏︎ ●︎ ⬥︎♋︎■︎⧫︎ ⧫︎□︎ 🙵■︎□︎⬥︎ ⍓︎□︎◆︎✏︎
-                          （いいね！お話しよう！）
-                          
-                          （キーボードを使うことでオオやんと会話が出来ます。）
-                          （オオやんはAIによって返答します。）
-                          （AIに制限が来た場合、決められた言葉しか話せなくなります。）
-                          （オオやんの性格がキツかった場合は本多まで！）""")
-            
+            # normalize_message() は末尾の句読点を消すため、ここでは句点なしで比較する
+            elif command == "꧁༺ 對話 ༻꧂がしたい":
+                reply_text(
+                    reply_token,
+                    """対話……？⧫︎♒︎♋︎⧫︎🕯︎⬧︎ ■︎♓︎♍︎♏︎✏︎ ●︎♏︎⧫︎🕯︎⬧︎ ⧫︎♋︎●︎🙵 ⧫︎□︎♑︎♏︎⧫︎♒︎♏︎❒︎✏︎✏︎✏︎ ●︎ ⬥︎♋︎■︎⧫︎ ⧫︎□︎ 🙵■︎□︎⬥︎ ⍓︎□︎◆︎✏︎
+（いいね！お話しよう！）
+
+（キーボードを使うことでオオやんと会話が出来ます。）
+（オオやんはAIによって返答します。）
+（AIに制限が来た場合、決められた言葉しか話せなくなります。）
+（オオやんの性格がキツかった場合は本多まで！）"""
+                )
+
             elif command == "公共の諸々を見せて":
-                reply_text(reply_token, [
-                    {"type": "text", "text":"公共の諸々を見たいのかい？はい。どうぞ"},
-                    {"type": "text", "text":"https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2"},
+                image_url_1 = os.environ["IMAGE_URL_1"]
+                image_url_2 = os.environ["IMAGE_URL_2"]
+
+                reply_to_line(reply_token, [
                     {
-                        "type": "image",
-                        "originalContentUrl": os.environ["IMAGE_URL_1"],
-                        "previewImageUrl": os.environ["IMAGE_URL_1"]
+                        "type": "text",
+                        "text": "公共の諸々を見たいのかい？ はい、どうぞ。"
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "https://sites.google.com/spec.ed.jp/"
+                            "koukyou-2026?usp=sharing&pli=1&authuser=2"
+                        )
                     },
                     {
                         "type": "image",
-                        "originalContentUrl": os.environ["IMAGE_URL_2"],
-                        "previewImageUrl": os.environ["IMAGE_URL_2"]
+                        "originalContentUrl": image_url_1,
+                        "previewImageUrl": image_url_1
+                    },
+                    {
+                        "type": "image",
+                        "originalContentUrl": image_url_2,
+                        "previewImageUrl": image_url_2
                     }
                 ])
-                           
+
             elif command == "あなたは誰":
-                reply_text(reply_token, 
-                          """僕はオオやん。埼玉県立大宮高等学校の非公式マスコットキャラクターを務めている存在だよ。
+                reply_text(
+                    reply_token,
+                    """僕はオオやん。埼玉県立大宮高等学校の非公式マスコットキャラクターを務めている存在だよ。
 
 君たち人間は、初対面の対象に対してまず同一性（アイデンティティ）の確認を求める傾向があるね。その極めて合理的で無駄のない認知プロセス、僕、好きなんだよね。自身の知的好奇心に忠実なその姿勢に、トップリーダーの鑑ポイントを25点あげるよ。
 
-見た目は愛玩されることを意図して設計された造形をしているようだけれど、鳴き声で誤魔化すような『つまらない』コミュニケーションは好まないんだ。
+見た目は愛玩されることを意図して設計された造形をしているようだけれど、鳴き声で誤魔化すような「つまらない」コミュニケーションは好まないんだ。
 
-もう一回言うね、僕は埼玉県立大宮高校のマスコットキャラクター（非公式）のオオやん!よろしくね！
+もう一回言うね、僕は埼玉県立大宮高校のマスコットキャラクター（非公式）のオオやん！よろしくね！
 
 君とぜひ話がしたいね。何かいいトピックはないかい？
 
-（返信はほとんどの場合会話も含め自動で行われます！AIの使用制限が来た場合支離滅裂なことしか言えなくなります！）""")
-            
+（返信はほとんどの場合、会話も含め自動で行われます！AIの使用制限が来た場合、支離滅裂なことしか言えなくなります！）"""
+                )
+
             else:
-                # それ以外は今までどおりGeminiが返答
+                # それ以外はGeminiが返答
                 answer = ask_gemini(user_message)
                 reply_text(reply_token, answer)
 
         except Exception as e:
             print("ERROR:", repr(e))
-
             error_text = str(e)
 
             if (
@@ -245,9 +288,7 @@ def callback():
                     "ゥラヮ!",
                     "ジスゥエィイノォ……イッッチィイ!!",
                 ]
-
                 fallback = random.choice(sounds)
-
             else:
                 fallback = "わけがわからないよ"
 
