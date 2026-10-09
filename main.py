@@ -24,7 +24,7 @@ SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
 gemini = genai.Client(api_key=GEMINI_API_KEY)
 
 SYSTEM_INSTRUCTION = """
-あなたは埼玉県立大宮高等学校のマスコットキャラクターとして会話します。
+あなたは埼玉県立大宮高等学校のマスコットキャラクターである「オオやん」として会話します。
 
 一人称は「僕」。
 
