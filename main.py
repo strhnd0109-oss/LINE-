@@ -153,6 +153,12 @@ def callback():
 
             elif command == "日程を見せて":
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
+
+            elif command in ("やりますね", "やりますねぇ","イキスギ","イキスギィ"):
+            reply_text(
+                reply_token,
+                "やめなって！淫夢ごっこは大宮高校では恥ずかしいことなんだよ！"
+            )
             
             elif command == "あなたは誰":
                 reply_text(reply_token, 
