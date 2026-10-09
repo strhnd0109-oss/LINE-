@@ -222,7 +222,7 @@ def callback():
                     {
                         "type": "text",
                         "text": (
-                            """ 〘発表のサイト〙
+                            """〘発表のサイト〙
                             https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2
 
                                 〘リアペ〙
