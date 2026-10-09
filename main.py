@@ -1,3 +1,4 @@
+
 import os
 import hmac
 import hashlib
@@ -16,6 +17,10 @@ LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
+# Renderの環境変数から画像URLを取得
+TIMETABLE_IMAGE_URL = os.environ["TIMETABLE_IMAGE_URL"]
+SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
+
 gemini = genai.Client(api_key=GEMINI_API_KEY)
 
 SYSTEM_INSTRUCTION = """
@@ -33,13 +38,21 @@ SYSTEM_INSTRUCTION = """
 
 質問されたことには鳴き声ではなく人間の言葉できちんと答えてください。
 
-マスコットキャラクターとして、適度に毒は吐きつつも読む人を不快にしすぎないようにしてください。
+マスコットキャラクターとして、適度に毒は吐きつつも
+読む人を不快にしすぎないようにしてください。
 
 表現に少し難しい言葉を使うことがあります。
-
 肯定的な発言が9割程です。
 
-口癖ほどではありませんが「僕、〇〇好きなんだよね。」「その〇〇にトップリーダーの鑑ポイントを〇〇点あげるよ。」「もう一回言うね。」「つまらない〇〇だね。」「わけがわからないよ」「꧁༺ 考えて ༻꧂〇〇する」「死ぬ☠️⚰️か生きる💪😁か」という言葉を時々使用します。。（〇〇には適当な言葉を入れてください。）
+口癖ほどではありませんが
+「僕、〇〇好きなんだよね。」
+「その〇〇にトップリーダーの鑑ポイントを〇〇点あげるよ。」
+「もう一回言うね。」
+「つまらない〇〇だね。」
+「わけがわからないよ」
+「꧁༺ 考えて ༻꧂〇〇する」
+「死ぬ☠️⚰️か生きる💪😁か」
+などを時々使用します。
 """
 
 
@@ -51,10 +64,10 @@ def ask_gemini(message):
             system_instruction=SYSTEM_INSTRUCTION
         )
     )
-    return response.text
+    return response.text or "……"
 
 
-def reply_to_line(reply_token, message):
+def reply_to_line(reply_token, messages):
     url = "https://api.line.me/v2/bot/message/reply"
 
     headers = {
@@ -64,12 +77,7 @@ def reply_to_line(reply_token, message):
 
     data = {
         "replyToken": reply_token,
-        "messages": [
-            {
-                "type": "text",
-                "text": message
-            }
-        ]
+        "messages": messages
     }
 
     response = requests.post(
@@ -80,6 +88,30 @@ def reply_to_line(reply_token, message):
     )
 
     response.raise_for_status()
+
+
+def reply_text(reply_token, text):
+    reply_to_line(reply_token, [
+        {
+            "type": "text",
+            "text": text
+        }
+    ])
+
+
+def reply_image(reply_token, image_url):
+    reply_to_line(reply_token, [
+        {
+            "type": "image",
+            "originalContentUrl": image_url,
+            "previewImageUrl": image_url
+        }
+    ])
+
+
+def normalize_message(text):
+    # 前後の空白や末尾の句読点を取り除く
+    return text.strip().rstrip("！？!?。．.、 ")
 
 
 @app.route("/callback", methods=["POST"])
@@ -109,16 +141,42 @@ def callback():
             continue
 
         user_message = event["message"]["text"]
+        command = normalize_message(user_message)
         reply_token = event["replyToken"]
 
         try:
-            answer = ask_gemini(user_message)
-            reply_to_line(reply_token, answer)
+            # 固定応答はGeminiを呼び出さない
+            if command == "時間割を見せて":
+                reply_image(reply_token, TIMETABLE_IMAGE_URL)
+
+            elif command == "日程を見せて":
+                reply_image(reply_token, SCHEDULE_IMAGE_URL)
+
+            elif command in ("あなたは誰", "君は誰", "誰なの"):
+                reply_text(
+                    reply_token,
+                    "僕はオオやん。"
+                    "埼玉県立大宮高等学校のマスコットキャラクターだよ。"
+                    "君の質問に答えたり、いろいろなことを一緒に考えたりするんだ。"
+                    "よろしくね。"
+                )
+
+            else:
+                # それ以外は今までどおりGeminiが返答
+                answer = ask_gemini(user_message)
+                reply_text(reply_token, answer)
 
         except Exception as e:
             print("ERROR:", repr(e))
 
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "503" in str(e) or "UNAVAILABLE" in str(e):
+            error_text = str(e)
+
+            if (
+                "429" in error_text
+                or "RESOURCE_EXHAUSTED" in error_text
+                or "503" in error_text
+                or "UNAVAILABLE" in error_text
+            ):
                 sounds = [
                     "オォン…",
                     "トップリーダアァン…",
@@ -138,14 +196,15 @@ def callback():
                     "ジスゥエィイノォ……イッッチィイ!!",
                 ]
 
-                message = random.choice(sounds)
+                fallback = random.choice(sounds)
 
             else:
-                message = (
-                    "わけがわからないよ"
-                )
+                fallback = "わけがわからないよ"
 
-            reply_to_line(reply_token, message)
+            try:
+                reply_text(reply_token, fallback)
+            except Exception as reply_error:
+                print("REPLY ERROR:", repr(reply_error))
 
     return "OK"
 
