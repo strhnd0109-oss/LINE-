@@ -222,10 +222,13 @@ def callback():
                     {
                         "type": "text",
                         "text": (
-                            """https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2
+                            """〘発表のサイト〙
+                            https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2
+
+                            〘リアペ〙
                             https://forms.gle/nZ8SGMsCArVQEv8q8
                             
-                            ─────このリンクを踏むとエラーが出てきますが、『・・・』からデフォルトのブラウザで開いていただくと正常に動作します！"""
+                            ─────このリンクを踏むとエラーが出てくる可能性がありますが、『・・・』からデフォルトのブラウザで開いていただくと正常に動作します！"""
                         )
                     },
                     {
