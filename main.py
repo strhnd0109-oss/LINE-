@@ -223,8 +223,7 @@ def callback():
                     {
                         "type": "text",
                         "text": (
-                            "https://sites.google.com/spec.ed.jp/"
-                            "koukyou-2026?usp=sharing&pli=1&authuser=2"
+                            "https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2"
                         )
                     },
                     {
