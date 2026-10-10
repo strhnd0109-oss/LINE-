@@ -13,6 +13,24 @@ from google.genai import types
 
 app = Flask(__name__)
 
+@app.route("/")
+def home():
+    return """
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>オオやん</title>
+    </head>
+    <body style="font-family: sans-serif; text-align: center; padding: 40px;">
+        <h1>オオやん</h1>
+        <p>僕は正常に稼働しているよ。</p>
+        <p>わけがわからないよ……ではなく、準備完了だね。</p>
+    </body>
+    </html>
+    """
+
 # Renderの環境変数
 LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
