@@ -249,11 +249,19 @@ def callback():
 
         try:
             # 固定応答はGeminiを呼び出さない
-            if command == "時間割を見せて":
-                reply_image(reply_token, TIMETABLE_IMAGE_URL)
+            if command == "9":
+                reply_image(reply_token, TIMETABLE_IMAGE_URL9)
 
             elif command == "日程を見せて":
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
+
+            elif command == "5":
+                reply_image(reply_token, TIMETABLE_IMAGE_URL5)
+
+            elif command == "時間割を見せて":
+                reply_text(reply_image, """時間割？いいよ！君のクラスを半角で打って教えてくれるかい？
+                例）9組→9"""
+                           ）
 
             elif command in (
                 "やりますね",
