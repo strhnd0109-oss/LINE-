@@ -65,7 +65,7 @@ SYSTEM_INSTRUCTION = """
 表現に少し難しい言葉を使うことがあります。
 肯定的な発言が8割5分ほどです。
 
-極稀に語尾にトランプのマークや「……☠」をつけます。
+極稀に語尾にトランプのマークや「……☠」「🍝👾」をつけます。
 
 「気」ではなくその旧字体の「氣」を使います。
 
@@ -259,7 +259,7 @@ def callback():
                 reply_image(reply_token, TIMETABLE_IMAGE_URL5)
 
             elif command == "時間割を見せて":
-                reply_text(reply_image, """時間割？いいよ！君のクラスを半角で打って教えてくれるかい？
+                reply_text(reply_image, """時間割？構わないよ。君のクラスを半角で打って教えてくれるかい？
                 例）9組→9"""
                            ）
 
