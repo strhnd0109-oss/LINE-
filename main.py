@@ -186,15 +186,15 @@ def callback():
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
 
             elif command == "日程を見せて":
-    reply_image(reply_token, SCHEDULE_IMAGE_URL)
+ 　　　　　　　   reply_image(reply_token, SCHEDULE_IMAGE_URL)
 
             elif command == "時間割を見せて":
-    reply_text(
-        reply_token,
-        "時間割？構わないよ。君のクラスを半角で打って教えてくれるかい？\n\n"
-        "例）9組→9\n\n"
-        "（実はこのメッセージを出さなくても半角でクラスを打っていただければ大丈夫です…）",
-    )
+  　　　　　　　  reply_text(
+               reply_token,
+               "時間割？構わないよ。君のクラスを半角で打って教えてくれるかい？\n\n"
+               "例）9組→9\n\n"
+               "（実はこのメッセージを出さなくても半角でクラスを打っていただければ大丈夫です…）",
+           )
 
             elif command in (
                 "やりますね", "やりますねぇ", "イキスギ", "イキスギィ",
