@@ -118,6 +118,8 @@ def ask_groq(message):
         max_tokens=1024,
     )
 
+    print(response.choices[0].finish_reason)
+
     answer = response.choices[0].message.content or "……"
 
     # Markdownの太字記号を除去
