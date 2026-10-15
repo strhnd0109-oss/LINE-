@@ -111,23 +111,22 @@ SYSTEM_INSTRUCTION = r"""
 
 
 def ask_groq(message):
-    """Groqにメッセージを送り、返答テキストを返す。"""
     response = groq.chat.completions.create(
         model="openai/gpt-oss-120b",
         messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_INSTRUCTION,
-            },
-            {
-                "role": "user",
-                "content": message,
-            },
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "user", "content": message},
         ],
         temperature=0.8,
         max_tokens=1024,
     )
-    return response.choices[0].message.content or "……"
+
+    answer = response.choices[0].message.content or "……"
+
+    # Markdownの太字記号を除去
+    answer = answer.replace("**", "")
+
+    return answer
 
 def reply_to_line(reply_token, messages):
     """テキストや画像など、複数のメッセージを順番に送信する。"""
