@@ -239,7 +239,7 @@ def callback():
                 )
 
             elif command == "公共の諸々を見せて":
-                image_url_1 = os.environ["IMAGE_URL_1"]
+                image_url_1 = os.environ["IMAGE_URL_2"]
                 image_url_2 = os.environ["IMAGE_URL_2"]
                 reply_to_line(reply_token, [
                     {"type": "text", "text": "公共の諸々を見たいのかい？ はい、どうぞ。"},
