@@ -38,7 +38,7 @@ SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
 TIMETABLE_IMAGE_URL9 = os.environ["TIMETABLE_IMAGE_URL9"]
 TIMETABLE_IMAGE_URL5 = os.environ["TIMETABLE_IMAGE_URL5"]
 
-gemini = genai.Client(api_key=GEMINI_API_KEY)
+groq = Groq(api_key=GROQ_API_KEY)
 
 
 SYSTEM_INSTRUCTION = r"""
