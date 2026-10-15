@@ -6,8 +6,7 @@ import random
 
 import requests
 from flask import Flask, request, abort
-from google import genai
-from google.genai import types
+from groq import Groq
 
 app = Flask(__name__)
 
@@ -34,7 +33,7 @@ def home():
 # Renderの環境変数
 LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
 TIMETABLE_IMAGE_URL9 = os.environ["TIMETABLE_IMAGE_URL9"]
 TIMETABLE_IMAGE_URL5 = os.environ["TIMETABLE_IMAGE_URL5"]
@@ -103,15 +102,24 @@ SYSTEM_INSTRUCTION = r"""
 """
 
 
-def ask_gemini(message):
-    """Geminiにメッセージを送り、返答テキストを返す。"""
-    response = gemini.models.generate_content(
-        model="gemini-3.7-flash",
-        contents=message,
-        config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
+def ask_groq(message):
+    """Groqにメッセージを送り、返答テキストを返す。"""
+    response = groq.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM_INSTRUCTION,
+            },
+            {
+                "role": "user",
+                "content": message,
+            },
+        ],
+        temperature=0.8,
+        max_tokens=1024,
     )
-    return response.text or "……"
-
+    return response.choices[0].message.content or "……"
 
 def reply_to_line(reply_token, messages):
     """テキストや画像など、複数のメッセージを順番に送信する。"""
@@ -261,7 +269,7 @@ def callback():
                 )
 
             else:
-                answer = ask_gemini(user_message)
+                answer = ask_groq(user_message)
                 reply_text(reply_token, answer)
 
         except Exception as e:
