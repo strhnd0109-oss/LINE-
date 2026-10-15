@@ -124,7 +124,7 @@ Markdownの太字（** *）や斜体（ *）など、ほかの装飾書式は使
 
 def ask_groq(message):
     response = groq.chat.completions.create(
-        model="openai/gpt-oss-20b",
+        model="openai/gpt-oss-120b",
         messages=[
             {"role": "system", "content": SYSTEM_INSTRUCTION},
             {"role": "user", "content": message},
