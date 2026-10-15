@@ -115,7 +115,7 @@ def ask_groq(message):
             {"role": "user", "content": message},
         ],
         temperature=0.8,
-        max_tokens=1024,
+        max_tokens=2048,
     )
 
     print(response.choices[0].finish_reason)
