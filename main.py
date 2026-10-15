@@ -194,11 +194,19 @@ def callback():
                 reply_image(reply_token, SCHEDULE_IMAGE_URL)
 
             elif command == "時間割を見せて":
-                reply_text(
+                reply_to_line(
                     reply_token,
-                    "時間割？構わないよ。君のクラスを半角で打って教えてくれるかい？\n\n"
-                    "例）9組→9\n\n"
-                    "（実はこのメッセージを出さなくても半角でクラスを打っていただければ大丈夫です…）",
+                    [
+                        {
+                            "type": "image",
+                            "originalContentUrl": TIMETABLE_IMAGE_URL9,
+                            "previewImageUrl": TIMETABLE_IMAGE_URL9,
+                        },
+                        {
+                            "type": "text",
+                            "text": "これが9組の時間割だよ！もし君が9組じゃあないなら、　5　みたいに半角の数字で組を教えてくれれば対応できるよ！",
+                        },
+                    ],
                 )
 
             elif command in (
