@@ -239,8 +239,6 @@ def callback():
                 )
 
             elif command == "公共の諸々を見せて":
-                image_url_1 = os.environ["IMAGE_URL_2"]
-                image_url_2 = os.environ["IMAGE_URL_2"]
                 reply_to_line(reply_token, [
                     {"type": "text", "text": "公共の諸々を見たいのかい？ はい、どうぞ。"},
                     {"type": "text", "text": (
@@ -250,8 +248,6 @@ def callback():
                         "https://forms.gle/nZ8SGMsCArVQEv8q8\n\n"
                         "リンクを開いてエラーが出る場合は、「・・・」からデフォルトのブラウザで開いてみてね。"
                     )},
-                    {"type": "image", "originalContentUrl": image_url_1, "previewImageUrl": image_url_1},
-                    {"type": "image", "originalContentUrl": image_url_2, "previewImageUrl": image_url_2},
                 ])
 
             elif command == "あなたは誰":
