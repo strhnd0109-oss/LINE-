@@ -265,7 +265,7 @@ def callback():
                     reply_token,
                     "体育の振り返りがしたいんだね。その勤勉さにトップリーダーの鏡ポイントを88点あげるよ。\n"
                     "振り返りフォームのリンクを貼っておくね。\n\n"
-                    "リンク"
+                    "https://docs.google.com/forms/d/e/1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/viewform"
                 )
 
             elif command == "貴方は誰":
