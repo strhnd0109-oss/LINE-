@@ -454,6 +454,22 @@ def callback():
                     "https://docs.google.com/forms/d/e/1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/viewform",
                 )
 
+            elif user_message == "貴方と会話がしたい！":
+    reply_to_line(
+        reply_token,
+        [
+            {
+                "type": "image",
+                "originalContentUrl": os.environ["KEYBOARD_IMAGE_URL"],
+                "previewImageUrl": os.environ["KEYBOARD_IMAGE_URL"]
+            },
+            {
+                "type": "text",
+                "text": "会話をしたいのかい？ なら、目の前のキーボードで話しかけてみるといいよ！"
+            }
+        ]
+    )
+
             elif command == "貴方は誰":
                 reply_text(
                     reply_token,
