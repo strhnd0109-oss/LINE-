@@ -1,3 +1,4 @@
+
 import os
 import hmac
 import hashlib
@@ -138,11 +139,10 @@ def ask_groq(message):
     print(response.choices[0].finish_reason)
 
     answer = response.choices[0].message.content or "……"
-
-    # Markdownの太字記号を除去
     answer = answer.replace("**", "")
 
     return answer
+
 
 def ask_groq_with_image(image_base64, mime_type):
     response = groq.chat.completions.create(
@@ -193,7 +193,14 @@ def reply_to_line(reply_token, messages):
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
     }
     data = {"replyToken": reply_token, "messages": messages}
-    response = requests.post(url, headers=headers, json=data, timeout=10)
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=data,
+        timeout=10,
+    )
+
     if not response.ok:
         print("LINE API STATUS:", response.status_code)
         print("LINE API RESPONSE:", response.text)
@@ -201,15 +208,21 @@ def reply_to_line(reply_token, messages):
 
 
 def reply_text(reply_token, text):
-    reply_to_line(reply_token, [{"type": "text", "text": text}])
+    reply_to_line(
+        reply_token,
+        [{"type": "text", "text": text}],
+    )
 
 
 def reply_image(reply_token, image_url):
-    reply_to_line(reply_token, [{
-        "type": "image",
-        "originalContentUrl": image_url,
-        "previewImageUrl": image_url,
-    }])
+    reply_to_line(
+        reply_token,
+        [{
+            "type": "image",
+            "originalContentUrl": image_url,
+            "previewImageUrl": image_url,
+        }],
+    )
 
 
 def normalize_message(text):
@@ -220,9 +233,13 @@ def normalize_message(text):
 def callback():
     body = request.get_data()
     signature = request.headers.get("x-line-signature", "")
+
     digest = hmac.new(
-        LINE_CHANNEL_SECRET.encode("utf-8"), body, hashlib.sha256
+        LINE_CHANNEL_SECRET.encode("utf-8"),
+        body,
+        hashlib.sha256,
     ).digest()
+
     expected_signature = base64.b64encode(digest).decode("utf-8")
 
     if not hmac.compare_digest(signature, expected_signature):
@@ -230,94 +247,83 @@ def callback():
 
     data = request.get_json(silent=True) or {}
 
-    
-for event in data.get("events", []):
-    if event.get("type") != "message":
-        continue
+    for event in data.get("events", []):
+        if event.get("type") != "message":
+            continue
 
-    message_data = event.get("message", {})
-    reply_token = event.get("replyToken")
-
-    if not reply_token:
-        continue
-
-    # 画像メッセージを受信した場合
-    if message_data.get("type") == "image":
-        try:
-            message_id = message_data.get("id")
-
-            if not message_id:
-                continue
-
-            # LINEから画像データを取得
-            image_response = requests.get(
-                f"https://api-data.line.me/v2/bot/message/"
-                f"{message_id}/content",
-                headers={
-                    "Authorization": (
-                        f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
-                    )
-                },
-                timeout=20,
-            )
-            image_response.raise_for_status()
-
-            mime_type = image_response.headers.get(
-                "Content-Type", ""
-            ).split(";")[0].lower()
-
-            if mime_type not in (
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-            ):
-                reply_text(
-                    reply_token,
-                    "うへぇ〜、この画像形式は読み取れないみたいだね。"
-                    "JPEGかPNGの画像を送ってみて！",
-                )
-                continue
-
-            # 画像をBase64形式に変換
-            image_base64 = base64.b64encode(
-                image_response.content
-            ).decode("ascii")
-
-            # 画像対応モデルで解析
-            answer = ask_groq_with_image(
-                image_base64,
-                mime_type,
-            )
-
-            reply_text(reply_token, answer)
-
-        except Exception as e:
-            print("IMAGE ERROR:", repr(e))
-            try:
-                reply_text(
-                    reply_token,
-                    "わけがわからないよ……画像の読み取りに失敗したみたいだね。"
-                    "別の画像でもう一度試してみて！",
-                )
-            except Exception as reply_error:
-                print("IMAGE REPLY ERROR:", repr(reply_error))
-
-        continue
-
-    # 画像以外は、従来どおりテキストだけを処理
-    if message_data.get("type") != "text":
-        continue
-
-    user_message = message_data.get("text", "")
-    command = normalize_message(user_message)
-
-        user_message = message_data.get("text", "")
-        command = normalize_message(user_message)
+        message_data = event.get("message", {})
         reply_token = event.get("replyToken")
+
         if not reply_token:
             continue
 
         try:
+            # 画像認識
+            if message_data.get("type") == "image":
+                message_id = message_data.get("id")
+
+                if not message_id:
+                    continue
+
+                # LINEから画像データを取得
+                image_response = requests.get(
+                    f"https://api-data.line.me/v2/bot/message/"
+                    f"{message_id}/content",
+                    headers={
+                        "Authorization": (
+                            f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+                        ),
+                    },
+                    timeout=20,
+                )
+                image_response.raise_for_status()
+
+                mime_type = image_response.headers.get(
+                    "Content-Type", ""
+                ).split(";")[0].lower()
+
+                if mime_type not in (
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp",
+                ):
+                    reply_text(
+                        reply_token,
+                        "うへぇ〜、この画像形式は読み取れないみたいだね。"
+                        "JPEGかPNGの画像を送ってみて！",
+                    )
+                    continue
+
+                # Groqの画像入力上限に合わせて確認（20 MB）
+                if len(image_response.content) > 20 * 1024 * 1024:
+                    reply_text(
+                        reply_token,
+                        "この画像は大きすぎるみたいだね。"
+                        "サイズを小さくしてから、もう一度送ってみて！",
+                    )
+                    continue
+
+                # 画像をBase64形式に変換
+                image_base64 = base64.b64encode(
+                    image_response.content
+                ).decode("ascii")
+
+                # 画像対応モデルで解析
+                answer = ask_groq_with_image(
+                    image_base64,
+                    mime_type,
+                )
+
+                reply_text(reply_token, answer)
+                continue
+
+            # テキスト以外のメッセージは対象外
+            if message_data.get("type") != "text":
+                continue
+
+            user_message = message_data.get("text", "")
+            command = normalize_message(user_message)
+
             # クラス別時間割
             if command == "9":
                 reply_image(reply_token, TIMETABLE_IMAGE_URL9)
@@ -339,14 +345,25 @@ for event in data.get("events", []):
                         },
                         {
                             "type": "text",
-                            "text": "これが9組の時間割だよ！もし君が9組じゃあないなら、　5　みたいに半角の数字で組を教えてくれれば対応できるよ！",
+                            "text": (
+                                "これが9組の時間割だよ！"
+                                "もし君が9組じゃあないなら、"
+                                "5みたいに半角の数字で組を教えてくれれば"
+                                "対応できるよ！"
+                            ),
                         },
                     ],
                 )
 
             elif command in (
-                "やりますね", "やりますねぇ", "イキスギ", "イキスギィ",
-                "やりますねえ", "イクイク", "ん", "あっ（察し）",
+                "やりますね",
+                "やりますねぇ",
+                "イキスギ",
+                "イキスギィ",
+                "やりますねえ",
+                "イクイク",
+                "ん",
+                "あっ（察し）",
             ):
                 reply_text(
                     reply_token,
@@ -354,41 +371,62 @@ for event in data.get("events", []):
                 )
 
             elif command == "トルーパーソリュート":
-                reply_to_line(reply_token, [
-                    {"type": "text", "text": "トルーパーソリュート、かい。"},
-                    {"type": "text", "text": (
-                        "僕、トルーパーソリュート、好きなんだよね。\n\n"
-                        "Trooper Salute（トルーパーソリュート）は、名古屋発の5人組シンフォニック・インディーロックバンドだよ。"
-                        "浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。"
-                        "2025年にはFUJI ROCK FESTIVALにも出演しているよ。\n\n"
-                        "こういう独自の音楽性を持つバンドを知っているとは、君の音楽的好奇心に"
-                        "トップリーダーの鑑ポイントを85点あげるよ！\n\nぜひ聴いてみるといい。"
-                    )},
-                    {"type": "text", "text": (
-                        "https://open.spotify.com/playlist/3prJ3IWcC97oEbKl9gC7N4"
-                        "?si=-WKiDGJFTYybD28Ai4SQtA&utm_source=copy-link"
-                        "&pi=iRhZzywnT_qZv"
-                    )},
-                ])
+                reply_to_line(
+                    reply_token,
+                    [
+                        {
+                            "type": "text",
+                            "text": "トルーパーソリュート、かい。",
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "僕、トルーパーソリュート、好きなんだよね。\n\n"
+                                "Trooper Salute（トルーパーソリュート）は、名古屋発の5人組シンフォニック・インディーロックバンドだよ。"
+                                "浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。"
+                                "2025年にはFUJI ROCK FESTIVALにも出演しているよ。\n\n"
+                                "こういう独自の音楽性を持つバンドを知っているとは、君の音楽的好奇心に"
+                                "トップリーダーの鑑ポイントを85点あげるよ！\n\nぜひ聴いてみるといい。"
+                            ),
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "https://open.spotify.com/playlist/3prJ3IWcC97oEbKl9gC7N4"
+                                "?si=-WKiDGJFTYybD28Ai4SQtA&utm_source=copy-link"
+                                "&pi=iRhZzywnT_qZv"
+                            ),
+                        },
+                    ],
+                )
 
             elif command == "公共の諸々を見せて":
-                reply_to_line(reply_token, [
-                    {"type": "text", "text": "公共の諸々を見たいのかい？ はい、どうぞ。"},
-                    {"type": "text", "text": (
-                        "〘発表のサイト〙\n"
-                        "https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2\n\n"
-                        "〘リアペ〙\n"
-                        "https://forms.gle/nZ8SGMsCArVQEv8q8\n\n"
-                        "リンクを開いてエラーが出る場合は、「・・・」からデフォルトのブラウザで開いてみてね。"
-                    )},
-                ])
+                reply_to_line(
+                    reply_token,
+                    [
+                        {
+                            "type": "text",
+                            "text": "公共の諸々を見たいのかい？ はい、どうぞ。",
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "〘発表のサイト〙\n"
+                                "https://sites.google.com/spec.ed.jp/koukyou-2026?usp=sharing&pli=1&authuser=2\n\n"
+                                "〘リアペ〙\n"
+                                "https://forms.gle/nZ8SGMsCArVQEv8q8\n\n"
+                                "リンクを開いてエラーが出る場合は、「・・・」からデフォルトのブラウザで開いてみてね。"
+                            ),
+                        },
+                    ],
+                )
 
             elif command == "体育の振り返りがしたい":
                 reply_text(
                     reply_token,
                     "体育の振り返りがしたいんだね。その勤勉さにトップリーダーの鏡ポイントを88点あげるよ。\n"
                     "振り返りフォームのリンクを貼っておくね。\n\n"
-                    "https://docs.google.com/forms/d/e/1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/viewform"
+                    "https://docs.google.com/forms/d/e/1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/viewform",
                 )
 
             elif command == "貴方は誰":
@@ -410,18 +448,32 @@ for event in data.get("events", []):
 
         except Exception as e:
             print("ERROR:", repr(e))
+
             error_text = str(e)
+
             if any(marker in error_text for marker in (
-                "429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"
+                "429",
+                "RESOURCE_EXHAUSTED",
+                "503",
+                "UNAVAILABLE",
             )):
-                sounds = [
-                    "オォン…", "トップリーダアァン…", "ホーム……リィ…ダァ…",
-                    "オオコウスイ!", "キュゥ……キュゥ……", "フォオ……ステップゥ……",
-                    "キョウガクッ!", "…………………", "……", "ォォミャーン", "𒅒",
+                fallback = random.choice([
+                    "オォン…",
+                    "トップリーダアァン…",
+                    "ホーム……リィ…ダァ…",
+                    "オオコウスイ!",
+                    "キュゥ……キュゥ……",
+                    "フォオ……ステップゥ……",
+                    "キョウガクッ!",
+                    "…………………",
+                    "……",
+                    "ォォミャーン",
+                    "𒅒",
                     "（傷だらけで膝をつきながら）ハァ…ハァ……ならば私は…トップリーダーだ。（指パチンッッッ!!!）",
-                    "ゥラヮ!", "ジスゥエィイノォ……イッッチィイ!!", "ア ナ ト リ ア",
-                ]
-                fallback = random.choice(sounds)
+                    "ゥラヮ!",
+                    "ジスゥエィイノォ……イッッチィイ!!",
+                    "ア ナ ト リ ア",
+                ])
             else:
                 fallback = "わけがわからないよ"
 
