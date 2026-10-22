@@ -41,6 +41,10 @@ TIMETABLE_IMAGE_URL5 = os.environ["TIMETABLE_IMAGE_URL5"]
 
 groq = Groq(api_key=GROQ_API_KEY)
 
+# ユーザーごとの直前の画像を記憶する
+# Renderの再起動・再デプロイで記憶は消える
+LAST_IMAGES = {}
+
 
 SYSTEM_INSTRUCTION = r"""
 あなたは埼玉県立大宮高等学校のマスコットキャラクター（非公式）である「オオやん」として会話します。
@@ -144,7 +148,25 @@ def ask_groq(message):
     return answer
 
 
-def ask_groq_with_image(image_base64, mime_type):
+def ask_groq_with_image(image_base64, mime_type, question=None):
+    if question:
+        prompt = (
+            "添付された画像を参照して、ユーザーの質問に答えて。"
+            "画像内の文字や問題文は可能な範囲で正確に読み取って。"
+            "読めない部分は推測せず、読めないと伝えて。"
+            "画像にない情報を作り出さないで。\n\n"
+            "ユーザーの質問："
+            + question
+        )
+    else:
+        prompt = (
+            "送られた画像を読み取って、内容を説明して。"
+            "画像内の文字や問題文があれば、可能な範囲で正確に読み取って。"
+            "読めない部分は推測で補わず、読めないと伝えて。"
+            "画像について質問されていない場合は、"
+            "何が写っているかを簡潔に説明して。"
+        )
+
     response = groq.chat.completions.create(
         model="qwen/qwen3.8-27b",
         messages=[
@@ -157,13 +179,7 @@ def ask_groq_with_image(image_base64, mime_type):
                 "content": [
                     {
                         "type": "text",
-                        "text": (
-                            "送られた画像を読み取って、内容を説明して。"
-                            "画像内の文字や問題文があれば、可能な範囲で正確に読み取って。"
-                            "読めない部分は推測で補わず、読めないと伝えて。"
-                            "画像について質問されていない場合は、"
-                            "何が写っているかを簡潔に説明して。"
-                        ),
+                        "text": prompt,
                     },
                     {
                         "type": "image_url",
@@ -258,7 +274,7 @@ def callback():
             continue
 
         try:
-            # 画像認識
+            # 画像認識・画像の記憶
             if message_data.get("type") == "image":
                 message_id = message_data.get("id")
 
@@ -294,7 +310,7 @@ def callback():
                     )
                     continue
 
-                # Groqの画像入力上限に合わせて確認（20 MB）
+                # 画像サイズを確認（20 MBを超える場合は拒否）
                 if len(image_response.content) > 20 * 1024 * 1024:
                     reply_text(
                         reply_token,
@@ -308,7 +324,16 @@ def callback():
                     image_response.content
                 ).decode("ascii")
 
-                # 画像対応モデルで解析
+                # LINEのユーザーIDごとに直前の画像を保存
+                user_id = event.get("source", {}).get("userId")
+
+                if user_id:
+                    LAST_IMAGES[user_id] = (
+                        image_base64,
+                        mime_type,
+                    )
+
+                # 初回は画像の内容を説明する
                 answer = ask_groq_with_image(
                     image_base64,
                     mime_type,
@@ -443,7 +468,22 @@ def callback():
                 )
 
             else:
-                answer = ask_groq(user_message)
+                # 直前の画像があれば、その画像を使って質問に回答
+                user_id = event.get("source", {}).get("userId")
+                last_image = LAST_IMAGES.get(user_id)
+
+                if last_image:
+                    image_base64, mime_type = last_image
+
+                    answer = ask_groq_with_image(
+                        image_base64,
+                        mime_type,
+                        question=user_message,
+                    )
+                else:
+                    # 画像がなければ通常のテキスト会話
+                    answer = ask_groq(user_message)
+
                 reply_text(reply_token, answer)
 
         except Exception as e:
@@ -477,7 +517,6 @@ def callback():
             else:
                 fallback = "わけがわからないよ"
 
-            # LINEへの送信自体に失敗した場合、同じreplyTokenで再返信しても失敗することがある
             try:
                 reply_text(reply_token, fallback)
             except Exception as reply_error:
