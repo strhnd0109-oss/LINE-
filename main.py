@@ -1,9 +1,9 @@
-
 import os
 import hmac
 import hashlib
 import base64
 import random
+import time
 
 import requests
 from flask import Flask, request, abort
@@ -41,9 +41,44 @@ TIMETABLE_IMAGE_URL5 = os.environ["TIMETABLE_IMAGE_URL5"]
 
 groq = Groq(api_key=GROQ_API_KEY)
 
-# ユーザーごとの直前の画像を記憶する
-# Renderの再起動・再デプロイで記憶は消える
+# ユーザーごとの直前の画像を記憶する。
+# 保存形式：(画像のBase64、MIMEタイプ、保存時刻)
+# Renderの再起動・再デプロイで記憶は消える。
 LAST_IMAGES = {}
+
+# 画像を記憶する時間：10分
+IMAGE_MEMORY_SECONDS = 600
+
+
+def get_last_image(user_id):
+    """期限内に保存された画像だけを返す。期限切れなら削除する。"""
+    if not user_id:
+        return None
+
+    saved = LAST_IMAGES.get(user_id)
+    if saved is None:
+        return None
+
+    image_base64, mime_type, saved_at = saved
+
+    if time.time() - saved_at >= IMAGE_MEMORY_SECONDS:
+        LAST_IMAGES.pop(user_id, None)
+        return None
+
+    return image_base64, mime_type
+
+
+def cleanup_expired_images():
+    """次のWebhook処理時に、期限切れの画像データを削除する。"""
+    now = time.time()
+    expired_users = [
+        user_id
+        for user_id, (_, _, saved_at) in LAST_IMAGES.items()
+        if now - saved_at >= IMAGE_MEMORY_SECONDS
+    ]
+
+    for user_id in expired_users:
+        LAST_IMAGES.pop(user_id, None)
 
 
 SYSTEM_INSTRUCTION = r"""
@@ -144,7 +179,6 @@ def ask_groq(message):
 
     answer = response.choices[0].message.content or "……"
     answer = answer.replace("**", "")
-
     return answer
 
 
@@ -170,24 +204,15 @@ def ask_groq_with_image(image_base64, mime_type, question=None):
     response = groq.chat.completions.create(
         model="qwen/qwen3.8-27b",
         messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_INSTRUCTION,
-            },
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": prompt,
-                    },
+                    {"type": "text", "text": prompt},
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": (
-                                f"data:{mime_type};base64,"
-                                f"{image_base64}"
-                            )
+                            "url": f"data:{mime_type};base64,{image_base64}"
                         },
                     },
                 ],
@@ -224,10 +249,7 @@ def reply_to_line(reply_token, messages):
 
 
 def reply_text(reply_token, text):
-    reply_to_line(
-        reply_token,
-        [{"type": "text", "text": text}],
-    )
+    reply_to_line(reply_token, [{"type": "text", "text": text}])
 
 
 def reply_image(reply_token, image_url):
@@ -264,6 +286,9 @@ def callback():
     data = request.get_json(silent=True) or {}
 
     for event in data.get("events", []):
+        # Webhookを処理するたびに期限切れ画像を掃除する
+        cleanup_expired_images()
+
         if event.get("type") != "message":
             continue
 
@@ -286,9 +311,7 @@ def callback():
                     f"https://api-data.line.me/v2/bot/message/"
                     f"{message_id}/content",
                     headers={
-                        "Authorization": (
-                            f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
-                        ),
+                        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
                     },
                     timeout=20,
                 )
@@ -319,26 +342,21 @@ def callback():
                     )
                     continue
 
-                # 画像をBase64形式に変換
                 image_base64 = base64.b64encode(
                     image_response.content
                 ).decode("ascii")
 
-                # LINEのユーザーIDごとに直前の画像を保存
                 user_id = event.get("source", {}).get("userId")
 
                 if user_id:
                     LAST_IMAGES[user_id] = (
                         image_base64,
                         mime_type,
+                        time.time(),
                     )
 
                 # 初回は画像の内容を説明する
-                answer = ask_groq_with_image(
-                    image_base64,
-                    mime_type,
-                )
-
+                answer = ask_groq_with_image(image_base64, mime_type)
                 reply_text(reply_token, answer)
                 continue
 
@@ -411,7 +429,8 @@ def callback():
                                 "浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。"
                                 "2025年にはFUJI ROCK FESTIVALにも出演しているよ。\n\n"
                                 "こういう独自の音楽性を持つバンドを知っているとは、君の音楽的好奇心に"
-                                "トップリーダーの鑑ポイントを85点あげるよ！\n\nぜひ聴いてみるといい。"
+                                "トップリーダーの鑑ポイントを85点あげるよ！\n\n"
+                                "ぜひ聴いてみるといい。"
                             ),
                         },
                         {
@@ -454,21 +473,28 @@ def callback():
                     "https://docs.google.com/forms/d/e/1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/viewform",
                 )
 
-            elif user_message == "貴方と会話がしたい！":
-    reply_to_line(
-        reply_token,
-        [
-            {
-                "type": "image",
-                "originalContentUrl": os.environ["KEYBOARD_IMAGE_URL"],
-                "previewImageUrl": os.environ["KEYBOARD_IMAGE_URL"]
-            },
-            {
-                "type": "text",
-                "text": "会話をしたいのかい？ なら、目の前のキーボードで話しかけてみるといいよ！"
-            }
-        ]
-    )
+            # 「！」や「。」などを付けて送っても反応する
+            elif command == "貴方と会話がしたい":
+                keyboard_image_url = os.environ["KEYBOARD_IMAGE_URL"]
+
+                reply_to_line(
+                    reply_token,
+                    [
+                        {
+                            "type": "image",
+                            "originalContentUrl": keyboard_image_url,
+                            "previewImageUrl": keyboard_image_url,
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "会話をしたいのかい？ "
+                                "なら、目の前のキーボードで"
+                                "話しかけてみるといいよ！"
+                            ),
+                        },
+                    ],
+                )
 
             elif command == "貴方は誰":
                 reply_text(
@@ -486,25 +512,22 @@ def callback():
             else:
                 # 直前の画像があれば、その画像を使って質問に回答
                 user_id = event.get("source", {}).get("userId")
-                last_image = LAST_IMAGES.get(user_id)
+                last_image = get_last_image(user_id)
 
-                if last_image:
+                if last_image is not None:
                     image_base64, mime_type = last_image
-
                     answer = ask_groq_with_image(
                         image_base64,
                         mime_type,
                         question=user_message,
                     )
                 else:
-                    # 画像がなければ通常のテキスト会話
                     answer = ask_groq(user_message)
 
                 reply_text(reply_token, answer)
 
         except Exception as e:
             print("ERROR:", repr(e))
-
             error_text = str(e)
 
             if any(marker in error_text for marker in (
