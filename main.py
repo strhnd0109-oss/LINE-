@@ -144,6 +144,47 @@ def ask_groq(message):
 
     return answer
 
+def ask_groq_with_image(image_base64, mime_type):
+    response = groq.chat.completions.create(
+        model="qwen/qwen3.8-27b",
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM_INSTRUCTION,
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "送られた画像を読み取って、内容を説明して。"
+                            "画像内の文字や問題文があれば、可能な範囲で正確に読み取って。"
+                            "読めない部分は推測で補わず、読めないと伝えて。"
+                            "画像について質問されていない場合は、"
+                            "何が写っているかを簡潔に説明して。"
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": (
+                                f"data:{mime_type};base64,"
+                                f"{image_base64}"
+                            )
+                        },
+                    },
+                ],
+            },
+        ],
+        temperature=0.6,
+        max_completion_tokens=1024,
+    )
+
+    answer = response.choices[0].message.content or "……"
+    return answer.replace("**", "")
+
+
 def reply_to_line(reply_token, messages):
     """テキストや画像など、複数のメッセージを順番に送信する。"""
     url = "https://api.line.me/v2/bot/message/reply"
@@ -189,12 +230,86 @@ def callback():
 
     data = request.get_json(silent=True) or {}
 
-    for event in data.get("events", []):
-        if event.get("type") != "message":
-            continue
-        message_data = event.get("message", {})
-        if message_data.get("type") != "text":
-            continue
+    
+for event in data.get("events", []):
+    if event.get("type") != "message":
+        continue
+
+    message_data = event.get("message", {})
+    reply_token = event.get("replyToken")
+
+    if not reply_token:
+        continue
+
+    # 画像メッセージを受信した場合
+    if message_data.get("type") == "image":
+        try:
+            message_id = message_data.get("id")
+
+            if not message_id:
+                continue
+
+            # LINEから画像データを取得
+            image_response = requests.get(
+                f"https://api-data.line.me/v2/bot/message/"
+                f"{message_id}/content",
+                headers={
+                    "Authorization": (
+                        f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+                    )
+                },
+                timeout=20,
+            )
+            image_response.raise_for_status()
+
+            mime_type = image_response.headers.get(
+                "Content-Type", ""
+            ).split(";")[0].lower()
+
+            if mime_type not in (
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+            ):
+                reply_text(
+                    reply_token,
+                    "うへぇ〜、この画像形式は読み取れないみたいだね。"
+                    "JPEGかPNGの画像を送ってみて！",
+                )
+                continue
+
+            # 画像をBase64形式に変換
+            image_base64 = base64.b64encode(
+                image_response.content
+            ).decode("ascii")
+
+            # 画像対応モデルで解析
+            answer = ask_groq_with_image(
+                image_base64,
+                mime_type,
+            )
+
+            reply_text(reply_token, answer)
+
+        except Exception as e:
+            print("IMAGE ERROR:", repr(e))
+            try:
+                reply_text(
+                    reply_token,
+                    "わけがわからないよ……画像の読み取りに失敗したみたいだね。"
+                    "別の画像でもう一度試してみて！",
+                )
+            except Exception as reply_error:
+                print("IMAGE REPLY ERROR:", repr(reply_error))
+
+        continue
+
+    # 画像以外は、従来どおりテキストだけを処理
+    if message_data.get("type") != "text":
+        continue
+
+    user_message = message_data.get("text", "")
+    command = normalize_message(user_message)
 
         user_message = message_data.get("text", "")
         command = normalize_message(user_message)
