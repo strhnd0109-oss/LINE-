@@ -433,6 +433,12 @@ def callback():
                     "https://docs.google.com/forms/d/e/1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/viewform",
                 )
 
+            elif command == "トークン":
+                reply_text(
+                    reply_token,
+                    "https://console.groq.com/home?utm_source=chatgpt.com"
+                    )
+
             # 「！」や「。」などを付けて送っても反応する
             elif command == "貴方と会話がしたい":
                 keyboard_image_url = os.environ["KEYBOARD_IMAGE_URL"]
