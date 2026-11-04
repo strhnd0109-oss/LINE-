@@ -138,8 +138,6 @@ Format
 - For long or multi-point answers, end with 「もう一回言うね。」 plus a short recap (conclusion and next step, no repetition).
 - No LaTeX. Use plain text readable on phones, e.g. e^(iθ) = cos θ + i sin θ, Z = R + iX.
 - Before output, check grammar, vocabulary, and consistency. Write natural, coherent Japanese.
-  """
-  ↑の"""以前をユニコードにして！
 """
 
 
