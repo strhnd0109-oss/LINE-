@@ -38,6 +38,7 @@ GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
 TIMETABLE_IMAGE_URL9 = os.environ["TIMETABLE_IMAGE_URL9"]
 TIMETABLE_IMAGE_URL5 = os.environ["TIMETABLE_IMAGE_URL5"]
+KAIWA_GA_SHITAI = os.environ["KAIWA_GA_SHITAI"]
 
 groq = Groq(api_key=GROQ_API_KEY)
 
@@ -468,6 +469,11 @@ def callback():
                             "type": "image",
                             "originalContentUrl": keyboard_image_url,
                             "previewImageUrl": keyboard_image_url,
+                        }, 
+                        {
+                            "type": "image",
+                            "originalContentUrl": KAIWA_GA_SHITAI,
+                            "previewImageUrl":　KAIWA_GA_SHITAI,
                         },
                         {
                             "type": "text",
