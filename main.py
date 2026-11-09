@@ -473,7 +473,7 @@ def callback():
                         {
                             "type": "image",
                             "originalContentUrl": KAIWA_GA_SHITAI,
-                            "previewImageUrl":　KAIWA_GA_SHITAI,
+                            "previewImageUrl": KAIWA_GA_SHITAI,
                         },
                         {
                             "type": "text",
