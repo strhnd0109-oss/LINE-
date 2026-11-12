@@ -345,6 +345,10 @@ def callback():
             user_message = message_data.get("text", "")
             command = normalize_message(user_message)
 
+            # 「うお」はWebhook側では無視する
+            if command == "うお":
+                continue
+    
             # クラス別時間割
             if command == "9":
                 reply_image(reply_token, TIMETABLE_IMAGE_URL9)
