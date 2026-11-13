@@ -811,31 +811,67 @@ def get_schedule_message():
 
     today = now_jst().date()
 
-    tomorrow = today + timedelta(days=1)
-
     today_key = today.strftime("%Y-%m-%d")
+    today_week = SCHEDULE_WEEKS.get(today_key)
 
-    tomorrow_key = tomorrow.strftime(
-        "%Y-%m-%d"
-    )
+    if today_week is None:
 
-    today_week = SCHEDULE_WEEKS.get(
-        today_key,
-        "A/B週の記載なし"
-    )
+        next_date = None
+        next_week = None
 
-    tomorrow_week = SCHEDULE_WEEKS.get(
-        tomorrow_key,
-        "A/B週の記載なし"
-    )
+        for date_key in sorted(SCHEDULE_WEEKS.keys()):
+
+            date_obj = datetime.strptime(
+                date_key,
+                "%Y-%m-%d"
+            ).date()
+
+            if date_obj > today:
+
+                next_date = date_obj
+                next_week = SCHEDULE_WEEKS[date_key]
+
+                break
+
+        if next_date:
+
+            return (
+                "今日はA/B週の記載がありません。\n"
+                f"次に分かっているのは"
+                f"{next_date.strftime('%m月%d日')}の"
+                f"{next_week}週です。"
+            )
+
+        return "今日はA/B週の記載がありません。"
+
+    next_week_date = today + timedelta(days=7)
+
+    next_week = None
+
+    for date_key in sorted(SCHEDULE_WEEKS.keys()):
+
+        date_obj = datetime.strptime(
+            date_key,
+            "%Y-%m-%d"
+        ).date()
+
+        if date_obj >= next_week_date:
+
+            next_week = SCHEDULE_WEEKS[date_key]
+
+            break
+
+    if next_week is None:
+
+        return (
+            f"今日は{today_week}週です。\n"
+            "来週のA/B週は記載されていません。"
+        )
 
     return (
-        f"今日は {today.strftime('%Y年%m月%d日')} で、"
-        f"{today_week}です。\n"
-        f"明日は {tomorrow.strftime('%Y年%m月%d日')} で、"
-        f"{tomorrow_week}です。"
+        f"今日は{today_week}週です。\n"
+        f"来週は{next_week}週です。"
     )
-
 
 def handle_fixed_message(
     user_id,
