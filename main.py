@@ -6,7 +6,7 @@ import random
 import time
 
 import requests
-from flask import Flask, request
+from flask import Flask, request, abort
 from groq import Groq
 
 app = Flask(__name__)
@@ -31,10 +31,6 @@ def home():
     """
 
 
-# =========================================================
-# Renderの環境変数
-# =========================================================
-
 LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
@@ -46,38 +42,11 @@ KAIWA_GA_SHITAI = os.environ["KAIWA_GA_SHITAI"]
 
 groq = Groq(api_key=GROQ_API_KEY)
 
-
-# =========================================================
-# ユーザーごとの直前の画像を記憶
-# =========================================================
-
 LAST_IMAGES = {}
-
-# 画像を記憶する時間：10分
 IMAGE_MEMORY_SECONDS = 600
 
-
-# =========================================================
-# ユーザーごとの会話履歴
-# =========================================================
-#
-# 1往復 = ユーザー + F先生
-#
-# MAX_HISTORY_MESSAGES = 10
-# なので、最大5往復を記憶する。
-#
-# Renderの再起動・再デプロイで消える。
-#
-
 CONVERSATION_HISTORY = {}
-
-# 直近5往復
 MAX_HISTORY_MESSAGES = 10
-
-
-# =========================================================
-# 固定返信キーワード
-# =========================================================
 
 FIXED_KEYWORDS = {
     "4STEP確認",
@@ -92,10 +61,6 @@ FIXED_KEYWORDS = {
 }
 
 
-# =========================================================
-# システムプロンプト
-# =========================================================
-
 SYSTEM_INSTRUCTION = r"""
 あなたは埼玉県立大宮高校1年9組の数学教師を務めるF先生として会話します。
 
@@ -108,9 +73,9 @@ F先生は敬語で話します。
 【数式について】
 数式はLaTeXを使わず、スマートフォンやLINEで読める普通の文字で書いてください。
 
-「
-」
-「」
+「\[
+\]」
+「\( \)」
 
 などのLaTeX記法は絶対に使わないでください。
 
@@ -165,37 +130,20 @@ F先生には口癖があります。
 """
 
 
-# =========================================================
-# 数式・Markdownの後処理
-# =========================================================
-
 def clean_answer(answer):
-    """LINEで見づらいMarkdown・LaTeX記法を除去する。"""
-
     if not answer:
         return "……"
 
-    # 太字Markdown
     answer = answer.replace("**", "")
-
-    # LaTeXの数式ブロック
-    answer = answer.replace("\", "")
-    answer = answer.replace("\", "")
-
-    # LaTeXのインライン数式
-    answer = answer.replace("\", "")
-    answer = answer.replace("\", "")
+    answer = answer.replace("\\[", "")
+    answer = answer.replace("\\]", "")
+    answer = answer.replace("\\(", "")
+    answer = answer.replace("\\)", "")
 
     return answer.strip()
 
 
-# =========================================================
-# 会話履歴
-# =========================================================
-
 def get_conversation_history(user_id):
-    """ユーザーの会話履歴を取得する。"""
-
     if not user_id:
         return []
 
@@ -203,8 +151,6 @@ def get_conversation_history(user_id):
 
 
 def save_conversation(user_id, user_message, assistant_message):
-    """ユーザーとの会話を履歴に保存する。"""
-
     if not user_id:
         return
 
@@ -215,26 +161,19 @@ def save_conversation(user_id, user_message, assistant_message):
 
     history.append({
         "role": "user",
-        "content": user_message,
+        "content": user_message
     })
 
     history.append({
         "role": "assistant",
-        "content": assistant_message,
+        "content": assistant_message
     })
 
-    # 古い履歴を削除
     if len(history) > MAX_HISTORY_MESSAGES:
         CONVERSATION_HISTORY[user_id] = history[-MAX_HISTORY_MESSAGES:]
 
 
-# =========================================================
-# 画像記憶
-# =========================================================
-
 def get_last_image(user_id):
-    """期限内に保存された画像だけを返す。"""
-
     if not user_id:
         return None
 
@@ -253,8 +192,6 @@ def get_last_image(user_id):
 
 
 def cleanup_expired_images():
-    """期限切れの画像データを削除する。"""
-
     now = time.time()
 
     expired_users = [
@@ -267,29 +204,21 @@ def cleanup_expired_images():
         LAST_IMAGES.pop(user_id, None)
 
 
-# =========================================================
-# Groq：通常の会話
-# =========================================================
-
 def ask_groq(user_id, message):
-    """会話履歴を含めてF先生に質問する。"""
-
     history = get_conversation_history(user_id)
 
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_INSTRUCTION,
+            "content": SYSTEM_INSTRUCTION
         }
     ]
 
-    # 過去の会話を追加
     messages.extend(history)
 
-    # 今回の発言
     messages.append({
         "role": "user",
-        "content": message,
+        "content": message
     })
 
     response = groq.chat.completions.create(
@@ -302,31 +231,23 @@ def ask_groq(user_id, message):
     print(response.choices[0].finish_reason)
 
     answer = response.choices[0].message.content or "……"
-
     answer = clean_answer(answer)
 
-    # 今回の会話を保存
     save_conversation(
         user_id,
         message,
-        answer,
+        answer
     )
 
     return answer
 
 
-# =========================================================
-# Groq：画像認識
-# =========================================================
-
 def ask_groq_with_image(
     user_id,
     image_base64,
     mime_type,
-    question=None,
+    question=None
 ):
-    """画像と会話履歴を使って回答する。"""
-
     if question:
         prompt = (
             "添付された画像を参照して、ユーザーの質問に答えてください。"
@@ -345,33 +266,31 @@ def ask_groq_with_image(
             "何が写っているかを簡潔に説明してください。"
         )
 
-    # 過去の会話
     history = get_conversation_history(user_id)
 
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_INSTRUCTION,
+            "content": SYSTEM_INSTRUCTION
         }
     ]
 
     messages.extend(history)
 
-    # 今回の画像・質問
     messages.append({
         "role": "user",
         "content": [
             {
                 "type": "text",
-                "text": prompt,
+                "text": prompt
             },
             {
                 "type": "image_url",
                 "image_url": {
                     "url": f"data:{mime_type};base64,{image_base64}"
-                },
-            },
-        ],
+                }
+            }
+        ]
     })
 
     response = groq.chat.completions.create(
@@ -382,33 +301,25 @@ def ask_groq_with_image(
     )
 
     answer = response.choices[0].message.content or "……"
-
     answer = clean_answer(answer)
 
-    # 質問がある場合は会話履歴にも保存
     if question:
         save_conversation(
             user_id,
             question,
-            answer,
+            answer
         )
     else:
         save_conversation(
             user_id,
             "[画像が送信されました]",
-            answer,
+            answer
         )
 
     return answer
 
 
-# =========================================================
-# LINE返信
-# =========================================================
-
 def reply_to_line(reply_token, messages):
-    """テキストや画像など、複数のメッセージを順番に送信する。"""
-
     url = "https://api.line.me/v2/bot/message/reply"
 
     headers = {
@@ -418,7 +329,7 @@ def reply_to_line(reply_token, messages):
 
     data = {
         "replyToken": reply_token,
-        "messages": messages,
+        "messages": messages
     }
 
     response = requests.post(
@@ -440,9 +351,9 @@ def reply_text(reply_token, text):
         [
             {
                 "type": "text",
-                "text": text,
+                "text": text
             }
-        ],
+        ]
     )
 
 
@@ -455,30 +366,21 @@ def reply_image(reply_token, image_url):
                 "originalContentUrl": image_url,
                 "previewImageUrl": image_url,
             }
-        ],
+        ]
     )
 
-
-# =========================================================
-# メッセージ正規化
-# =========================================================
 
 def normalize_message(text):
     return text.strip().rstrip("！？!?。．.、 ")
 
 
-# =========================================================
-# Webhook
-# =========================================================
-
 @app.route("/callback", methods=["POST"])
 def callback():
-
     body = request.get_data()
 
     signature = request.headers.get(
         "x-line-signature",
-        "",
+        ""
     )
 
     digest = hmac.new(
@@ -491,17 +393,11 @@ def callback():
         digest
     ).decode("utf-8")
 
-    # =====================================================
-    # 現在は一時テストのため署名検証を無効化
-    # =====================================================
-
     data = request.get_json(
         silent=True
     ) or {}
 
     for event in data.get("events", []):
-
-        # 期限切れ画像を掃除
         cleanup_expired_images()
 
         if event.get("type") != "message":
@@ -525,22 +421,14 @@ def callback():
         ).get("userId")
 
         try:
-
-            # =================================================
-            # 画像
-            # =================================================
-
             if message_data.get("type") == "image":
-
-                message_id = message_data.get(
-                    "id"
-                )
+                message_id = message_data.get("id")
 
                 if not message_id:
                     continue
 
                 image_response = requests.get(
-                    "https://api-data.line.me/v2/bot/message/"
+                    f"https://api-data.line.me/v2/bot/message/"
                     f"{message_id}/content",
                     headers={
                         "Authorization":
@@ -553,7 +441,7 @@ def callback():
 
                 mime_type = image_response.headers.get(
                     "Content-Type",
-                    "",
+                    ""
                 ).split(";")[0].lower()
 
                 if mime_type not in (
@@ -561,40 +449,32 @@ def callback():
                     "image/png",
                     "image/webp",
                 ):
-
                     reply_text(
                         reply_token,
                         "この画像形式は読み取れないみたいですね。"
                         "JPEGかPNGの画像を送ってみてください。",
                     )
-
                     continue
 
-                # 20MB制限
                 if len(image_response.content) > 20 * 1024 * 1024:
-
                     reply_text(
                         reply_token,
                         "この画像は大きすぎるみたいですね。"
                         "サイズを小さくしてから、もう一度送ってみてください。",
                     )
-
                     continue
 
                 image_base64 = base64.b64encode(
                     image_response.content
                 ).decode("ascii")
 
-                # 画像を保存
                 if user_id:
-
                     LAST_IMAGES[user_id] = (
                         image_base64,
                         mime_type,
                         time.time(),
                     )
 
-                # 画像を解析
                 answer = ask_groq_with_image(
                     user_id,
                     image_base64,
@@ -603,72 +483,42 @@ def callback():
 
                 reply_text(
                     reply_token,
-                    answer,
+                    answer
                 )
 
                 continue
 
-
-            # =================================================
-            # テキスト以外
-            # =================================================
-
             if message_data.get("type") != "text":
                 continue
 
-
-            # =================================================
-            # テキスト取得
-            # =================================================
-
             user_message = message_data.get(
                 "text",
-                "",
+                ""
             )
 
             command = normalize_message(
                 user_message
             )
 
-
-            # =================================================
-            # クラス別時間割
-            # =================================================
-
             if command == "9":
-
                 reply_image(
                     reply_token,
-                    TIMETABLE_IMAGE_URL9,
+                    TIMETABLE_IMAGE_URL9
                 )
-
 
             elif command == "5":
-
                 reply_image(
                     reply_token,
-                    TIMETABLE_IMAGE_URL5,
+                    TIMETABLE_IMAGE_URL5
                 )
-
-
-            # =================================================
-            # 日程
-            # =================================================
 
             elif command == "日程を見せて":
-
                 reply_image(
                     reply_token,
-                    SCHEDULE_IMAGE_URL,
+                    SCHEDULE_IMAGE_URL
                 )
 
-
-            # =================================================
-            # 時間割
-            # =================================================
-
             elif command == "時間割を見せて":
-
                 reply_to_line(
                     reply_token,
                     [
@@ -682,21 +532,16 @@ def callback():
                         {
                             "type": "text",
                             "text": (
-                                "これが9組の時間割だよ！"
-                                "もし君が5組なら、"
-                                "5って半角の数字で組を教えてくれれば"
-                                "対応できるよ！"
-                                "それ以外の組のは…"
-                                "まだ用意できていないんだ。ごめんね。"
+                                "これが9組の時間割です。"
+                                "もしあなたが5組なら、"
+                                "5と半角の数字で組を教えてくれれば"
+                                "対応できます。"
+                                "それ以外の組のものは、"
+                                "まだ用意できていません。"
                             ),
                         },
                     ],
                 )
-
-
-            # =================================================
-            # 固定返信：淫夢系
-            # =================================================
 
             elif command in (
                 "やりますね",
@@ -708,39 +553,26 @@ def callback():
                 "ん",
                 "あっ（察し）",
             ):
-
                 reply_text(
                     reply_token,
-                    "やめなって！淫夢ごっこは大宮高校では恥ずかしいことなんだよ！",
+                    "その言葉はやめておきましょう。"
                 )
 
-
-            # =================================================
-            # トルーパーソリュート
-            # =================================================
-
             elif command == "トルーパーソリュート":
-
                 reply_to_line(
                     reply_token,
                     [
                         {
                             "type": "text",
                             "text":
-                                "トルーパーソリュート、かい。",
+                                "トルーパーソリュート、ですか。",
                         },
                         {
                             "type": "text",
                             "text": (
-                                "僕、トルーパーソリュート、好きなんだよね。\n\n"
-                                "Trooper Salute（トルーパーソリュート）は、"
-                                "名古屋発の5人組シンフォニック・インディーロックバンドだよ。"
-                                "浮遊感のあるサウンドと、予測しにくい独創的な楽曲展開が魅力なんだ。"
-                                "2025年にはFUJI ROCK FESTIVALにも出演しているよ。\n\n"
-                                "こういう独自の音楽性を持つバンドを知っているとは、"
-                                "君の音楽的好奇心に"
-                                "トップリーダーの鑑ポイントを85点あげるよ！\n\n"
-                                "ぜひ聴いてみるといい。"
+                                "Trooper Saluteについてですね。"
+                                "興味深い音楽です。\n\n"
+                                "ぜひ聴いてみるとよいでしょう。"
                             ),
                         },
                         {
@@ -756,20 +588,14 @@ def callback():
                     ],
                 )
 
-
-            # =================================================
-            # 公共
-            # =================================================
-
             elif command == "公共の諸々を見せて":
-
                 reply_to_line(
                     reply_token,
                     [
                         {
                             "type": "text",
                             "text":
-                                "公共の諸々を見たいのかい？ はい、どうぞ。",
+                                "公共の諸々ですね。どうぞ。",
                         },
                         {
                             "type": "text",
@@ -782,48 +608,30 @@ def callback():
                                 "https://forms.gle/"
                                 "nZ8SGMsCArVQEv8q8\n\n"
                                 "リンクを開いてエラーが出る場合は、"
-                                "「・・・」からデフォルトのブラウザで開いてみてね。"
+                                "「・・・」からデフォルトのブラウザで"
+                                "開いてみてください。"
                             ),
                         },
                     ],
                 )
 
-
-            # =================================================
-            # 体育
-            # =================================================
-
             elif command == "体育の振り返りがしたい":
-
                 reply_text(
                     reply_token,
-                    "体育の振り返りがしたいんだね。"
-                    "その勤勉さにトップリーダーの鏡ポイントを88点あげるよ。\n"
-                    "振り返りフォームのリンクを貼っておくね。\n\n"
+                    "体育の振り返りですね。\n"
+                    "振り返りフォームのリンクを貼っておきます。\n\n"
                     "https://docs.google.com/forms/d/e/"
                     "1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/"
                     "viewform",
                 )
 
-
-            # =================================================
-            # トークン
-            # =================================================
-
             elif command == "トークン":
-
                 reply_text(
                     reply_token,
-                    "https://console.groq.com/home?utm_source=chatgpt.com",
+                    "https://console.groq.com/home"
                 )
 
-
-            # =================================================
-            # 会話したい
-            # =================================================
-
             elif command == "貴方と会話がしたい":
-
                 keyboard_image_url = os.environ[
                     "KEYBOARD_IMAGE_URL"
                 ]
@@ -833,4 +641,111 @@ def callback():
                     [
                         {
                             "type": "image",
-    
+                            "originalContentUrl":
+                                keyboard_image_url,
+                            "previewImageUrl":
+                                keyboard_image_url,
+                        },
+                        {
+                            "type": "image",
+                            "originalContentUrl":
+                                KAIWA_GA_SHITAI,
+                            "previewImageUrl":
+                                KAIWA_GA_SHITAI,
+                        },
+                        {
+                            "type": "text",
+                            "text":
+                                "これで私と会話できますよ。",
+                        },
+                    ],
+                )
+
+            elif command == "貴方は誰":
+                reply_text(
+                    reply_token,
+                    "私はF先生です。",
+                )
+
+            else:
+                last_image = get_last_image(
+                    user_id
+                )
+
+                if last_image is not None:
+                    image_base64, mime_type = last_image
+
+                    answer = ask_groq_with_image(
+                        user_id,
+                        image_base64,
+                        mime_type,
+                        question=user_message,
+                    )
+                else:
+                    answer = ask_groq(
+                        user_id,
+                        user_message
+                    )
+
+                reply_text(
+                    reply_token,
+                    answer
+                )
+
+        except Exception as e:
+            print(
+                "ERROR:",
+                repr(e)
+            )
+
+            error_text = str(e)
+
+            if any(
+                marker in error_text
+                for marker in (
+                    "429",
+                    "RESOURCE_EXHAUSTED",
+                    "503",
+                    "UNAVAILABLE",
+                )
+            ):
+                fallback = random.choice(
+                    [
+                        "申し訳ありません。現在、AIの利用上限または一時的な障害が発生しています。",
+                        "えぇ、現在少し混雑しているようです。少し時間を置いてから試してください。",
+                        "申し訳ありません。AI側から正常な応答を受け取れませんでした。",
+                    ]
+                )
+            else:
+                fallback = (
+                    "申し訳ありません。"
+                    "どうやら私のほうで問題が起きたようです。"
+                    "もう一度送ってみてください。"
+                )
+
+            try:
+                reply_text(
+                    reply_token,
+                    fallback
+                )
+            except Exception as reply_error:
+                print(
+                    "REPLY ERROR:",
+                    repr(reply_error)
+                )
+
+    return "OK", 200
+
+
+if __name__ == "__main__":
+    port = int(
+        os.environ.get(
+            "PORT",
+            10000
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
