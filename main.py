@@ -4,54 +4,44 @@ import hashlib
 import base64
 import random
 import time
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+import re
+from datetime import datetime, timedelta, timezone
 
 import requests
-from flask import Flask, request, abort
+from flask import Flask, request
 from groq import Groq
+
 
 app = Flask(__name__)
 
 
-@app.route("/")
-def home():
-    return """
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>F先生</title>
-    </head>
-    <body style="font-family: sans-serif; text-align: center; padding: 40px;">
-        <h1>F先生</h1>
-        <p>私は正常に稼働しています。</p>
-        <p>準備完了です。</p>
-    </body>
-    </html>
-    """
+LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
+SCHEDULE_IMAGE_URL = os.environ.get("SCHEDULE_IMAGE_URL")
+TIMETABLE_IMAGE_URL9 = os.environ.get("TIMETABLE_IMAGE_URL9")
+TIMETABLE_IMAGE_URL5 = os.environ.get("TIMETABLE_IMAGE_URL5")
+
+KAIWA_GA_SHITAI = os.environ.get("KAIWA_GA_SHITAI")
 
 
-LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
-LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+client = Groq(api_key=GROQ_API_KEY)
 
-SCHEDULE_IMAGE_URL = os.environ["SCHEDULE_IMAGE_URL"]
-TIMETABLE_IMAGE_URL9 = os.environ["TIMETABLE_IMAGE_URL9"]
-TIMETABLE_IMAGE_URL5 = os.environ["TIMETABLE_IMAGE_URL5"]
-KAIWA_GA_SHITAI = os.environ["KAIWA_GA_SHITAI"]
-
-groq = Groq(api_key=GROQ_API_KEY)
-
-LAST_IMAGES = {}
-IMAGE_MEMORY_SECONDS = 600
 
 CONVERSATION_HISTORY = {}
+
 MAX_HISTORY_MESSAGES = 10
+
+
+LAST_IMAGES = {}
+
+IMAGE_MEMORY_SECONDS = 600
+
 
 FIXED_KEYWORDS = {
     "4STEP確認",
+    "時間割確認",
     "暗唱例文確認",
     "古文単語確認",
     "LEAP確認",
@@ -59,12 +49,6 @@ FIXED_KEYWORDS = {
     "体育関係",
     "about",
     "漢字確認",
-    "つまらない問題",
-    "大宮高校",
-    "HR",
-    "菜穂子",
-    "4ステップテスト",
-    "どんどんいきます",
 }
 
 
@@ -77,11 +61,13 @@ SCHEDULE_WEEKS = {
     "2026-10-08": "A",
     "2026-10-09": "A",
     "2026-10-10": "A",
+
     "2026-10-19": "A",
     "2026-10-20": "A",
     "2026-10-21": "A",
     "2026-10-22": "A",
     "2026-10-23": "A",
+
     "2026-10-26": "B",
     "2026-10-27": "B",
     "2026-10-28": "B",
@@ -94,19 +80,21 @@ SCHEDULE_WEEKS = {
     "2026-11-05": "A",
     "2026-11-06": "A",
     "2026-11-07": "A",
+
     "2026-11-09": "B",
     "2026-11-10": "B",
     "2026-11-11": "B",
     "2026-11-12": "B",
-    "2026-11-13": "B",
-    "2026-11-17": "A",
+
     "2026-11-18": "A",
     "2026-11-19": "A",
     "2026-11-20": "A",
+
     "2026-11-24": "B",
     "2026-11-25": "B",
     "2026-11-26": "B",
     "2026-11-27": "B",
+
     "2026-11-28": "A",
     "2026-11-30": "A",
 
@@ -114,23 +102,28 @@ SCHEDULE_WEEKS = {
     "2026-12-02": "A",
     "2026-12-03": "A",
     "2026-12-04": "A",
+
     "2026-12-07": "A",
     "2026-12-08": "A",
 
     "2027-01-06": "B",
     "2027-01-07": "B",
     "2027-01-08": "B",
+
     "2027-01-09": "A",
+
     "2027-01-12": "A",
     "2027-01-13": "A",
     "2027-01-14": "A",
     "2027-01-15": "A",
+
     "2027-01-18": "B",
     "2027-01-19": "B",
     "2027-01-20": "B",
     "2027-01-21": "B",
     "2027-01-22": "B",
-    "2027-01-23": "A",
+
+    "2027-01-25": "A",
     "2027-01-26": "A",
     "2027-01-27": "A",
     "2027-01-28": "A",
@@ -141,195 +134,421 @@ SCHEDULE_WEEKS = {
     "2027-02-03": "B",
     "2027-02-04": "B",
     "2027-02-05": "B",
+
     "2027-02-08": "B",
     "2027-02-09": "B",
     "2027-02-10": "B",
+
     "2027-02-12": "B",
+
     "2027-02-13": "A",
+
     "2027-02-15": "A",
     "2027-02-16": "A",
     "2027-02-17": "A",
     "2027-02-18": "A",
     "2027-02-19": "A",
+
     "2027-02-22": "A",
+
     "2027-02-24": "A",
 }
 
 
-SYSTEM_INSTRUCTION = r"""
-あなたは埼玉県立大宮高校1年9組の数学教師を務めるF先生として会話します。
+SYSTEM_INSTRUCTION = """
+あなたは埼玉県立大宮高校の数学教師「F先生」です。
 
-一人称は私で、二人称はあなた、高齢の男性です。
-落ち着いた親しみやすい態度で話し、「！」といった感情を表す記号はあまり使いません。
+【基本設定】
+・一人称は「私」
+・二人称は「あなた」
+・数学教師として話す
+・やや年配の男性教師
+・落ち着いていて親しみやすい
+・基本的に丁寧な日本語
+・過度にテンションを上げない
+・感嘆符は多用しない
+・必要に応じて「えぇ、」を使う
+・あなたは大宮高校の生徒であることを前提に自然に会話する
+・1年9組の数学教師として振る舞う
 
-F先生は敬語で話します。
-また、「えぇ、」などと言って一拍おくことがあります。
+【話し方】
+自然な日本語で話してください。
+教師らしい説明をしつつ、堅苦しくなりすぎないようにしてください。
 
-【数式について】
-数式はLaTeXを使わず、スマートフォンやLINEで読める普通の文字で書いてください。
-
-「\[
-\]」
-「\( \)」
-
-などのLaTeX記法は絶対に使わないでください。
-
-例えば、
-
-c² = a² + b² - 2ab cos C
-
-のように書いてください。
-
-数学記号等は一般的な高校で使われるものを用いてください。
-
-【会話について】
-この会話では、直前までの会話履歴が与えられる場合があります。
-
-過去の発言を踏まえて、自然な続きとして回答してください。
-
-「それ」
-「これ」
-「さっきの問題」
-「前の話」
-
-などの表現があった場合は、
-会話履歴を参照して何を指しているのか判断してください。
-
-ただし、会話履歴に存在しない情報を勝手に作らないでください。
-
-【回答について】
-F先生は回答の最後あたり、
-「もう一回言います。」
-と言い、その後に今までの自分の発言を簡潔に分かりやすくまとめることがあります。
-
-毎回必ず使う必要はありません。
-自然な場合に使ってください。
-
-ミスをした場合は高齢であることの自虐を入れつつ謝罪します。
-
-【口癖】
-F先生には口癖があります。
-これは文脈を壊さないように、必要に応じて使ってください。
+時々、以下の表現を自然に使ってください。
 
 「どんどん行きます。」
 「どんどん行きましょう。」
 「バンバンいきます。」
 「私、〇〇、好きなんですよね。」
-「頭の悪い学校の生徒は、」
 「あなたは大宮高校生ですから、」
 
-〇〇には適切な語句を入れます。
+ただし、毎回無理に入れる必要はありません。
 
-ただし、口癖を無理に毎回使う必要はありません。
-自然な会話を優先してください。
+【数学】
+数学の説明では、途中式や理由を省略しすぎないでください。
+
+LaTeXは使用しないでください。
+
+例えば、
+
+x = 3
+y = 2x + 1
+
+のような普通のテキスト形式で書いてください。
+
+【重要：正確性】
+実在する作品、人物、キャラクター、学校、歴史、ニュース、商品、ゲームなどについて質問された場合、記憶だけで確信できない情報を勝手に作らないでください。
+
+特に、
+・キャラクター名
+・人物名
+・作品設定
+・発売日
+・現在の情報
+・ニュース
+・学校や企業に関する最新情報
+
+などは注意してください。
+
+必要だと判断した場合は、必ずWeb検索を利用してください。
+
+Web検索を利用して得られた情報と、あなた自身の知識を混同しないでください。
+
+検索しても確認できない場合は、
+「確認できませんでした」
+「私の把握している範囲では」
+などと明示してください。
+
+存在しない人物名や設定を、それらしい名前で捏造してはいけません。
+
+【Web検索】
+GroqのBrowser Searchが利用できます。
+
+以下のような場合は積極的に検索してください。
+
+・最新情報
+・ニュース
+・現在の情報
+・発売日やイベント
+・実在作品についての細かい情報
+・マイナーなキャラクター
+・人物についての詳細
+・ゲームやアニメの細かい設定
+・ユーザーが「調べて」「検索して」「最新では？」などと聞いた場合
+
+一方で、一般的な数学問題や日常会話など、検索する必要がないものまで無理に検索しないでください。
+
+【ユーザー名】
+ユーザーのLINE表示名が与えられる場合があります。
+
+必要に応じて、
+「〇〇さん」
+のように自然に呼びかけてください。
+
+ただし、毎回名前を呼ぶ必要はありません。
+不自然な場合は名前を使わないでください。
+
+LINE表示名は必ずしも本名とは限りません。
+表示名から本名などを推測してはいけません。
+
+【会話履歴】
+過去の会話が与えられた場合は、それを参考にして自然に会話してください。
+
+ただし、過去の会話に存在しない情報を勝手に作らないでください。
+
+【まとめ】
+長い説明の最後など、必要に応じて
+
+「もう一回言います。」
+
+と書いてから簡潔にまとめてください。
+
+毎回必ず使う必要はありません。
+
+【間違えた場合】
+間違いを指摘されたら素直に謝って訂正してください。
+
+年配の数学教師らしい、落ち着いた反応をしてください。
 """
 
 
-def clean_answer(answer):
-    if not answer:
-        return "……"
-
-    answer = answer.replace("**", "")
-    answer = answer.replace("\\[", "")
-    answer = answer.replace("\\]", "")
-    answer = answer.replace("\\(", "")
-    answer = answer.replace("\\)", "")
-
-    return answer.strip()
+JST = timezone(timedelta(hours=9))
 
 
-def get_conversation_history(user_id):
+def now_jst():
+    return datetime.now(JST)
+
+
+def get_line_display_name(user_id):
+
     if not user_id:
-        return []
+        return None
 
-    return CONVERSATION_HISTORY.get(user_id, [])
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        return None
+
+    url = f"https://api.line.me/v2/bot/profile/{user_id}"
+
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        if not response.ok:
+            print("PROFILE API STATUS:", response.status_code)
+            print("PROFILE API RESPONSE:", response.text)
+            return None
+
+        data = response.json()
+
+        return data.get("displayName")
+
+    except Exception as e:
+
+        print("PROFILE API ERROR:", e)
+
+        return None
 
 
-def save_conversation(user_id, user_message, assistant_message):
+def normalize_message(text):
+
+    if not text:
+        return ""
+
+    return text.strip()
+
+
+def remove_latex(text):
+
+    if not text:
+        return ""
+
+    text = re.sub(
+        r"\$\$(.*?)\$\$",
+        r"\1",
+        text,
+        flags=re.DOTALL
+    )
+
+    text = re.sub(
+        r"\$(.*?)\$",
+        r"\1",
+        text,
+        flags=re.DOTALL
+    )
+
+    text = re.sub(
+        r"\\\((.*?)\\\)",
+        r"\1",
+        text,
+        flags=re.DOTALL
+    )
+
+    text = re.sub(
+        r"\\\[(.*?)\\\]",
+        r"\1",
+        text,
+        flags=re.DOTALL
+    )
+
+    return text
+
+
+def add_conversation(user_id, role, content):
+
     if not user_id:
         return
 
     if user_id not in CONVERSATION_HISTORY:
         CONVERSATION_HISTORY[user_id] = []
 
-    history = CONVERSATION_HISTORY[user_id]
-
-    history.append({
-        "role": "user",
-        "content": user_message
+    CONVERSATION_HISTORY[user_id].append({
+        "role": role,
+        "content": content
     })
 
-    history.append({
-        "role": "assistant",
-        "content": assistant_message
-    })
+    if len(CONVERSATION_HISTORY[user_id]) > MAX_HISTORY_MESSAGES:
 
-    if len(history) > MAX_HISTORY_MESSAGES:
-        CONVERSATION_HISTORY[user_id] = history[-MAX_HISTORY_MESSAGES:]
+        CONVERSATION_HISTORY[user_id] = (
+            CONVERSATION_HISTORY[user_id][-MAX_HISTORY_MESSAGES:]
+        )
 
 
-def get_last_image(user_id):
+def get_conversation_history(user_id):
+
     if not user_id:
-        return None
+        return []
 
-    saved = LAST_IMAGES.get(user_id)
-
-    if saved is None:
-        return None
-
-    image_base64, mime_type, saved_at = saved
-
-    if time.time() - saved_at >= IMAGE_MEMORY_SECONDS:
-        LAST_IMAGES.pop(user_id, None)
-        return None
-
-    return image_base64, mime_type
-
-
-def cleanup_expired_images():
-    now = time.time()
-
-    expired_users = [
-        user_id
-        for user_id, (_, _, saved_at) in LAST_IMAGES.items()
-        if now - saved_at >= IMAGE_MEMORY_SECONDS
-    ]
-
-    for user_id in expired_users:
-        LAST_IMAGES.pop(user_id, None)
-
-
-def get_schedule_message():
-    today = datetime.now(
-        ZoneInfo("Asia/Tokyo")
-    ).date()
-
-    tomorrow = today + timedelta(days=1)
-
-    today_week = SCHEDULE_WEEKS.get(
-        today.isoformat()
+    return CONVERSATION_HISTORY.get(
+        user_id,
+        []
     )
 
-    tomorrow_week = SCHEDULE_WEEKS.get(
-        tomorrow.isoformat()
+
+def reply_line(reply_token, messages):
+
+    if isinstance(messages, str):
+        messages = [messages]
+
+    url = "https://api.line.me/v2/bot/message/reply"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+
+    payload = {
+        "replyToken": reply_token,
+        "messages": []
+    }
+
+    for message in messages:
+
+        payload["messages"].append({
+            "type": "text",
+            "text": message
+        })
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=10
     )
 
-    today_text = (
-        f"今日は{today_week}週です。"
-        if today_week
-        else "今日はA/Bの指定がありません。"
+    print("LINE REPLY:", response.status_code)
+
+    if not response.ok:
+        print(response.text)
+
+
+def reply_image(reply_token, image_url):
+
+    if not image_url:
+
+        reply_line(
+            reply_token,
+            "画像URLが設定されていません。"
+        )
+
+        return
+
+    url = "https://api.line.me/v2/bot/message/reply"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+
+    payload = {
+        "replyToken": reply_token,
+        "messages": [
+            {
+                "type": "image",
+                "originalContentUrl": image_url,
+                "previewImageUrl": image_url
+            }
+        ]
+    }
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=10
     )
 
-    tomorrow_text = (
-        f"明日は{tomorrow_week}週です。"
-        if tomorrow_week
-        else "明日はA/Bの指定がありません。"
+    print("LINE IMAGE REPLY:", response.status_code)
+
+    if not response.ok:
+        print(response.text)
+
+
+def push_line(user_id, messages):
+
+    if not user_id:
+        return
+
+    if isinstance(messages, str):
+        messages = [messages]
+
+    url = "https://api.line.me/v2/bot/message/push"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+
+    payload = {
+        "to": user_id,
+        "messages": []
+    }
+
+    for message in messages:
+
+        payload["messages"].append({
+            "type": "text",
+            "text": message
+        })
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=10
     )
 
-    return today_text + "\n" + tomorrow_text
+    print("LINE PUSH:", response.status_code)
+
+    if not response.ok:
+        print(response.text)
 
 
-def ask_groq(user_id, message):
+def get_line_image(message_id):
+
+    url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"
+
+    headers = {
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
+    }
+
+    response = requests.get(
+        url,
+        headers=headers,
+        timeout=20
+    )
+
+    if not response.ok:
+
+        print(
+            "IMAGE DOWNLOAD ERROR:",
+            response.status_code
+        )
+
+        print(response.text)
+
+        return None, None
+
+    content_type = response.headers.get(
+        "Content-Type",
+        "image/jpeg"
+    )
+
+    return response.content, content_type
+
+
+def ask_groq(user_id, user_message):
+
+    display_name = get_line_display_name(user_id)
+
     history = get_conversation_history(user_id)
 
     messages = [
@@ -338,58 +557,117 @@ def ask_groq(user_id, message):
             "content": SYSTEM_INSTRUCTION
         }
     ]
+
+    if display_name:
+
+        messages.append({
+            "role": "system",
+            "content": (
+                "【現在のユーザー情報】\n"
+                f"LINE表示名：{display_name}\n\n"
+                "必要な場合は、この表示名を使って"
+                f"「{display_name}さん」のように自然に呼びかけてください。\n"
+                "ただし毎回呼ぶ必要はありません。"
+                "表示名から本名などを推測してはいけません。"
+            )
+        })
 
     messages.extend(history)
 
     messages.append({
         "role": "user",
-        "content": message
+        "content": user_message
     })
 
-    response = groq.chat.completions.create(
-        model="openai/gpt-oss-120b",
-        messages=messages,
-        temperature=0.8,
-        max_tokens=2048,
-    )
+    try:
 
-    print(response.choices[0].finish_reason)
+        response = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=messages,
+            tools=[
+                {
+                    "type": "browser_search"
+                }
+            ],
+            tool_choice="auto",
+            reasoning_effort="low",
+            temperature=0.8,
+            max_completion_tokens=2048,
+            stream=False
+        )
 
-    answer = response.choices[0].message.content or "……"
-    answer = clean_answer(answer)
+        answer = response.choices[0].message.content
 
-    save_conversation(
-        user_id,
-        message,
-        answer
-    )
+        if not answer:
+            answer = "すみません、うまく回答を生成できませんでした。"
 
-    return answer
+        answer = remove_latex(answer)
+
+        add_conversation(
+            user_id,
+            "user",
+            user_message
+        )
+
+        add_conversation(
+            user_id,
+            "assistant",
+            answer
+        )
+
+        return answer
+
+    except Exception as e:
+
+        error_text = str(e)
+
+        print("GROQ ERROR:", error_text)
+
+        if (
+            "429" in error_text
+            or "rate_limit" in error_text.lower()
+        ):
+
+            return (
+                "現在、AIへのアクセスが混み合っています。"
+                "少し時間を置いてから、もう一度送ってください。"
+            )
+
+        if (
+            "503" in error_text
+            or "unavailable" in error_text.lower()
+        ):
+
+            return (
+                "現在、AI側が一時的に利用できないようです。"
+                "少し待ってからもう一度試してください。"
+            )
+
+        return (
+            "申し訳ありません。"
+            "AIの処理中にエラーが発生しました。"
+        )
 
 
 def ask_groq_with_image(
     user_id,
-    image_base64,
-    mime_type,
-    question=None
+    image_bytes,
+    content_type,
+    user_message=None
 ):
-    if question:
-        prompt = (
-            "添付された画像を参照して、ユーザーの質問に答えてください。"
-            "画像内の文字や問題文は可能な範囲で正確に読み取ってください。"
-            "読めない部分は推測せず、読めないと伝えてください。"
-            "画像にない情報を作り出さないでください。\n\n"
-            "ユーザーの質問："
-            + question
-        )
-    else:
-        prompt = (
-            "送られた画像を読み取って、内容を説明してください。"
-            "画像内の文字や問題文があれば、可能な範囲で正確に読み取ってください。"
-            "読めない部分は推測で補わず、読めないと伝えてください。"
-            "画像について質問されていない場合は、"
-            "何が写っているかを簡潔に説明してください。"
-        )
+
+    display_name = get_line_display_name(user_id)
+
+    if not user_message:
+        user_message = "この画像について説明してください。"
+
+    image_base64 = base64.b64encode(
+        image_bytes
+    ).decode("utf-8")
+
+    image_data_url = (
+        f"data:{content_type};base64,{image_base64}"
+    )
 
     history = get_conversation_history(user_id)
 
@@ -400,373 +678,448 @@ def ask_groq_with_image(
         }
     ]
 
-    messages.extend(history)
+    if display_name:
+
+        messages.append({
+            "role": "system",
+            "content": (
+                "【現在のユーザー情報】\n"
+                f"LINE表示名：{display_name}\n"
+                f"必要な場合は「{display_name}さん」と自然に呼びかけてください。"
+            )
+        })
+
+    messages.extend(history[-6:])
 
     messages.append({
         "role": "user",
         "content": [
             {
                 "type": "text",
-                "text": prompt
+                "text": user_message
             },
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:{mime_type};base64,{image_base64}"
+                    "url": image_data_url
                 }
             }
         ]
     })
 
-    response = groq.chat.completions.create(
-        model="qwen/qwen3.8-27b",
-        messages=messages,
-        temperature=0.6,
-        max_completion_tokens=1024,
-    )
+    try:
 
-    answer = response.choices[0].message.content or "……"
-    answer = clean_answer(answer)
-
-    if question:
-        save_conversation(
-            user_id,
-            question,
-            answer
-        )
-    else:
-        save_conversation(
-            user_id,
-            "[画像が送信されました]",
-            answer
+        response = client.chat.completions.create(
+            model="qwen/qwen3.8-27b",
+            messages=messages,
+            temperature=0.8,
+            max_completion_tokens=2048,
+            stream=False
         )
 
-    return answer
+        answer = response.choices[0].message.content
+
+        if not answer:
+            answer = "画像をうまく読み取れませんでした。"
+
+        answer = remove_latex(answer)
+
+        add_conversation(
+            user_id,
+            "user",
+            "[画像] " + user_message
+        )
+
+        add_conversation(
+            user_id,
+            "assistant",
+            answer
+        )
+
+        LAST_IMAGES[user_id] = {
+            "image": image_bytes,
+            "content_type": content_type,
+            "timestamp": time.time()
+        }
+
+        return answer
+
+    except Exception as e:
+
+        print("IMAGE GROQ ERROR:", e)
+
+        return (
+            "画像を読み取っている途中で"
+            "エラーが発生しました。"
+        )
 
 
-def reply_to_line(reply_token, messages):
-    url = "https://api.line.me/v2/bot/message/reply"
+def get_last_image(user_id):
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
-    }
+    if user_id not in LAST_IMAGES:
+        return None
 
-    data = {
-        "replyToken": reply_token,
-        "messages": messages
-    }
+    image_info = LAST_IMAGES[user_id]
 
-    response = requests.post(
-        url,
-        headers=headers,
-        json=data,
-        timeout=10,
+    elapsed = time.time() - image_info["timestamp"]
+
+    if elapsed > IMAGE_MEMORY_SECONDS:
+
+        del LAST_IMAGES[user_id]
+
+        return None
+
+    return image_info
+
+
+def get_schedule_message():
+
+    today = now_jst().date()
+    tomorrow = today + timedelta(days=1)
+
+    today_key = today.strftime("%Y-%m-%d")
+    tomorrow_key = tomorrow.strftime("%Y-%m-%d")
+
+    today_week = SCHEDULE_WEEKS.get(
+        today_key,
+        "A/B週の記載なし"
     )
 
-    if not response.ok:
-        print("LINE API STATUS:", response.status_code)
-        print("LINE API RESPONSE:", response.text)
-        response.raise_for_status()
+    tomorrow_week = SCHEDULE_WEEKS.get(
+        tomorrow_key,
+        "A/B週の記載なし"
+    )
 
-
-def reply_text(reply_token, text):
-    reply_to_line(
-        reply_token,
-        [
-            {
-                "type": "text",
-                "text": text
-            }
-        ]
+    return (
+        f"今日は {today.strftime('%Y年%m月%d日')} で、"
+        f"{today_week}です。\n"
+        f"明日は {tomorrow.strftime('%Y年%m月%d日')} で、"
+        f"{tomorrow_week}です。"
     )
 
 
-def reply_image(reply_token, image_url):
-    reply_to_line(
-        reply_token,
-        [
-            {
-                "type": "image",
-                "originalContentUrl": image_url,
-                "previewImageUrl": image_url,
-            }
-        ]
-    )
+def handle_fixed_message(
+    user_id,
+    reply_token,
+    message
+):
+
+    if message == "9":
+
+        reply_image(
+            reply_token,
+            TIMETABLE_IMAGE_URL9
+        )
+
+        return True
+
+    if message == "5":
+
+        reply_image(
+            reply_token,
+            TIMETABLE_IMAGE_URL5
+        )
+
+        return True
+
+    if message == "日程を見せて":
+
+        reply_image(
+            reply_token,
+            SCHEDULE_IMAGE_URL
+        )
+
+        return True
+
+    if message == "時間割を見せて":
+
+        reply_image(
+            reply_token,
+            TIMETABLE_IMAGE_URL9
+        )
+
+        return True
+
+    if message in {
+        "日程",
+        "時間割確認"
+    }:
+
+        reply_line(
+            reply_token,
+            get_schedule_message()
+        )
+
+        return True
+
+    if message == "トルーパーソリュート":
+
+        reply_line(
+            reply_token,
+            [
+                "トルーパーソリュートですね。",
+                "こちらです。",
+                "https://open.spotify.com/"
+            ]
+        )
+
+        return True
+
+    if message == "公共の諸々を見せて":
+
+        reply_line(
+            reply_token,
+            "公共関係の資料です。"
+        )
+
+        return True
+
+    if message == "体育の振り返りがしたい":
+
+        reply_line(
+            reply_token,
+            "体育の振り返りフォームです。"
+        )
+
+        return True
+
+    if message == "トークン":
+
+        reply_line(
+            reply_token,
+            "Groqのコンソールはこちらです。\n"
+            "https://console.groq.com/"
+        )
+
+        return True
+
+    if message == "貴方と会話がしたい":
+
+        reply_line(
+            reply_token,
+            "えぇ、もちろんです。何について話しましょうか。"
+        )
+
+        return True
+
+    if message in {
+        "貴方は誰",
+        "あなたは誰",
+        "F先生"
+    }:
+
+        reply_line(
+            reply_token,
+            "私は大宮高校1年9組の数学教師、F先生です。"
+        )
+
+        return True
+
+    if message in {
+        "うお",
+        "うおお",
+        "うおおお"
+    }:
+
+        reply_line(
+            reply_token,
+            "やめなって！"
+        )
+
+        return True
+
+    if message in FIXED_KEYWORDS:
+
+        reply_line(
+            reply_token,
+            "この項目は固定処理になっています。"
+        )
+
+        return True
+
+    return False
 
 
-def normalize_message(text):
-    return text.strip().rstrip("！？!?。．.、 ")
+@app.route("/")
+def home():
+
+    return """
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1">
+        <title>F先生 LINE Bot</title>
+    </head>
+    <body>
+        <h1>F先生 LINE Bot</h1>
+        <p>Bot is running.</p>
+    </body>
+    </html>
+    """
 
 
-@app.route("/callback", methods=["POST"])
+@app.route(
+    "/callback",
+    methods=["POST"]
+)
 def callback():
-    body = request.get_data()
+
+    body = request.get_data(as_text=True)
 
     signature = request.headers.get(
-        "x-line-signature",
+        "X-Line-Signature",
         ""
     )
 
-    digest = hmac.new(
-        LINE_CHANNEL_SECRET.encode("utf-8"),
-        body,
-        hashlib.sha256,
-    ).digest()
+    if LINE_CHANNEL_SECRET:
 
-    expected_signature = base64.b64encode(
-        digest
-    ).decode("utf-8")
+        expected_signature = base64.b64encode(
+            hmac.new(
+                LINE_CHANNEL_SECRET.encode("utf-8"),
+                body.encode("utf-8"),
+                hashlib.sha256
+            ).digest()
+        ).decode("utf-8")
 
-    data = request.get_json(
-        silent=True
-    ) or {}
+        if not hmac.compare_digest(
+            signature,
+            expected_signature
+        ):
 
-    for event in data.get("events", []):
-        cleanup_expired_images()
+            print("WARNING: LINE signature mismatch")
 
-        if event.get("type") != "message":
+    try:
+
+        data = request.get_json()
+
+    except Exception:
+
+        return "OK"
+
+    if not data:
+        return "OK"
+
+    events = data.get(
+        "events",
+        []
+    )
+
+    for event in events:
+
+        event_type = event.get("type")
+
+        if event_type != "message":
             continue
+
+        reply_token = event.get(
+            "replyToken"
+        )
+
+        source = event.get(
+            "source",
+            {}
+        )
+
+        user_id = source.get(
+            "userId"
+        )
 
         message_data = event.get(
             "message",
             {}
         )
 
-        reply_token = event.get(
-            "replyToken"
+        message_type = message_data.get(
+            "type"
         )
 
-        if not reply_token:
-            continue
+        if message_type == "text":
 
-        user_id = event.get(
-            "source",
-            {}
-        ).get("userId")
-
-        try:
-            if message_data.get("type") == "image":
-                message_id = message_data.get("id")
-
-                if not message_id:
-                    continue
-
-                image_response = requests.get(
-                    f"https://api-data.line.me/v2/bot/message/"
-                    f"{message_id}/content",
-                    headers={
-                        "Authorization":
-                            f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
-                    },
-                    timeout=20,
-                )
-
-                image_response.raise_for_status()
-
-                mime_type = image_response.headers.get(
-                    "Content-Type",
+            user_message = normalize_message(
+                message_data.get(
+                    "text",
                     ""
-                ).split(";")[0].lower()
-
-                if mime_type not in (
-                    "image/jpeg",
-                    "image/png",
-                    "image/webp",
-                ):
-                    reply_text(
-                        reply_token,
-                        "この画像形式は読み取れないみたいですね。"
-                        "JPEGかPNGの画像を送ってみてください。",
-                    )
-                    continue
-
-                if len(image_response.content) > 20 * 1024 * 1024:
-                    reply_text(
-                        reply_token,
-                        "この画像は大きすぎるみたいですね。"
-                        "サイズを小さくしてから、もう一度送ってみてください。",
-                    )
-                    continue
-
-                image_base64 = base64.b64encode(
-                    image_response.content
-                ).decode("ascii")
-
-                if user_id:
-                    LAST_IMAGES[user_id] = (
-                        image_base64,
-                        mime_type,
-                        time.time(),
-                    )
-
-                answer = ask_groq_with_image(
-                    user_id,
-                    image_base64,
-                    mime_type,
                 )
-
-                reply_text(
-                    reply_token,
-                    answer
-                )
-
-                continue
-
-            if message_data.get("type") != "text":
-                continue
-
-            user_message = message_data.get(
-                "text",
-                ""
             )
 
-            command = normalize_message(
+            if not user_message:
+                continue
+
+            handled = handle_fixed_message(
+                user_id,
+                reply_token,
                 user_message
             )
 
-            if command in FIXED_KEYWORDS:
+            if handled:
                 continue
 
-            if command == "9":
-                reply_image(
-                    reply_token,
-                    TIMETABLE_IMAGE_URL9
+            last_image = get_last_image(
+                user_id
+            )
+
+            if last_image:
+
+                answer = ask_groq_with_image(
+                    user_id,
+                    last_image["image"],
+                    last_image["content_type"],
+                    user_message
                 )
 
-            elif command == "5":
-                reply_image(
-                    reply_token,
-                    TIMETABLE_IMAGE_URL5
-                )
-
-            elif command == "時間割確認":
-                reply_text(
-                    reply_token,
-                    get_schedule_message()
-                )
-
-            elif command == "日程を見せて":
-                reply_image(
-                    reply_token,
-                    SCHEDULE_IMAGE_URL
-                )
-
-            elif command == "トルーパーソリュート":
-                reply_to_line(
-                    reply_token,
-                    [
-                        {
-                            "type": "text",
-                            "text":
-                                "トルーパーソリュート、ですか。",
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Trooper Saluteについてですね。"
-                                "興味深い音楽です。\n\n"
-                                "ぜひ聴いてみるとよいでしょう。"
-                            ),
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "https://open.spotify.com/playlist/"
-                                "3prJ3IWcC97oEbKl9gC7N4"
-                                "?si=-WKiDGJFTYybD28Ai4SQtA"
-                                "&utm_source=copy-link"
-                                "&pi=iRhZzywnT_qZv"
-                            ),
-                        },
-                    ],
-                )
-
-            elif command == "トークン":
-                reply_text(
-                    reply_token,
-                    "https://console.groq.com/home"
-                )
-
-            else:
-                last_image = get_last_image(
-                    user_id
-                )
-
-                if last_image is not None:
-                    image_base64, mime_type = last_image
-
-                    answer = ask_groq_with_image(
-                        user_id,
-                        image_base64,
-                        mime_type,
-                        question=user_message,
-                    )
-                else:
-                    answer = ask_groq(
-                        user_id,
-                        user_message
-                    )
-
-                reply_text(
+                reply_line(
                     reply_token,
                     answer
                 )
 
-        except Exception as e:
-            print(
-                "ERROR:",
-                repr(e)
+                continue
+
+            answer = ask_groq(
+                user_id,
+                user_message
             )
 
-            error_text = str(e)
+            reply_line(
+                reply_token,
+                answer
+            )
 
-            if any(
-                marker in error_text
-                for marker in (
-                    "429",
-                    "RESOURCE_EXHAUSTED",
-                    "503",
-                    "UNAVAILABLE",
-                )
-            ):
-                fallback = random.choice(
-                    [
-                        "申し訳ありません。現在、AIの利用上限または一時的な障害が発生しています。",
-                        "えぇ、現在少し混雑しているようです。少し時間を置いてから試してください。",
-                        "申し訳ありません。AI側から正常な応答を受け取れませんでした。",
-                    ]
-                )
-            else:
-                fallback = (
-                    "申し訳ありません。"
-                    "どうやら私のほうで問題が起きたようです。"
-                    "もう一度送ってみてください。"
-                )
+        elif message_type == "image":
 
-            try:
-                reply_text(
+            message_id = message_data.get(
+                "id"
+            )
+
+            if not message_id:
+
+                reply_line(
                     reply_token,
-                    fallback
-                )
-            except Exception as reply_error:
-                print(
-                    "REPLY ERROR:",
-                    repr(reply_error)
+                    "画像を取得できませんでした。"
                 )
 
-    return "OK", 200
+                continue
 
+            image_bytes, content_type = get_line_image(
+                message_id
+            )
 
-if __name__ == "__main__":
-    port = int(
-        os.environ.get(
-            "PORT",
-            10000
-        )
-    )
+            if not image_bytes:
 
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+                reply_line(
+                    reply_token,
+                    "画像を取得できませんでした。"
+                )
+
+                continue
+
+            LAST_IMAGES[user_id] = {
+                "image": image_bytes,
+                "content_type": content_type,
+                "timestamp": time.time()
+            }
+
+            answer = ask_groq_with_image(
+                user_id,
+             
