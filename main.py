@@ -50,6 +50,13 @@ LAST_IMAGES = {}
 # 画像を記憶する時間：10分
 IMAGE_MEMORY_SECONDS = 600
 
+FIXED_KEYWORDS = {
+    "うお",
+    "時間割",
+    "日程を見せて",
+    "公共の諸々を見せて",
+    "体育の振り返りがしたい",
+}
 
 def get_last_image(user_id):
     """期限内に保存された画像だけを返す。期限切れなら削除する。"""
@@ -346,7 +353,7 @@ def callback():
             command = normalize_message(user_message)
 
             # 「うお」はWebhook側では無視する
-            if command == "うお":
+            if command in FIXED_KEYWORDS:
                 continue
     
             # クラス別時間割
