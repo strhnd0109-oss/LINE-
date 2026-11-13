@@ -58,6 +58,10 @@ FIXED_KEYWORDS = {
     "体育関係",
     "about",
     "漢字確認",
+    "つまらない問題",
+    "大宮高校",
+    "HR",
+    "作者",
 }
 
 
@@ -521,46 +525,6 @@ def callback():
                     SCHEDULE_IMAGE_URL
                 )
 
-            elif command == "時間割を見せて":
-                reply_to_line(
-                    reply_token,
-                    [
-                        {
-                            "type": "image",
-                            "originalContentUrl":
-                                TIMETABLE_IMAGE_URL9,
-                            "previewImageUrl":
-                                TIMETABLE_IMAGE_URL9,
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "これが9組の時間割です。"
-                                "もしあなたが5組なら、"
-                                "5と半角の数字で組を教えてくれれば"
-                                "対応できます。"
-                                "それ以外の組のものは、"
-                                "まだ用意できていません。"
-                            ),
-                        },
-                    ],
-                )
-
-            elif command in (
-                "やりますね",
-                "やりますねぇ",
-                "イキスギ",
-                "イキスギィ",
-                "やりますねえ",
-                "イクイク",
-                "ん",
-                "あっ（察し）",
-            ):
-                reply_text(
-                    reply_token,
-                    "その言葉はやめておきましょう。"
-                )
-
             elif command == "トルーパーソリュート":
                 reply_to_line(
                     reply_token,
@@ -591,83 +555,10 @@ def callback():
                     ],
                 )
 
-            elif command == "公共の諸々を見せて":
-                reply_to_line(
-                    reply_token,
-                    [
-                        {
-                            "type": "text",
-                            "text":
-                                "公共の諸々ですね。どうぞ。",
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "〘発表のサイト〙\n"
-                                "https://sites.google.com/spec.ed.jp/"
-                                "koukyou-2026?usp=sharing"
-                                "&pli=1&authuser=2\n\n"
-                                "〘リアペ〙\n"
-                                "https://forms.gle/"
-                                "nZ8SGMsCArVQEv8q8\n\n"
-                                "リンクを開いてエラーが出る場合は、"
-                                "「・・・」からデフォルトのブラウザで"
-                                "開いてみてください。"
-                            ),
-                        },
-                    ],
-                )
-
-            elif command == "体育の振り返りがしたい":
-                reply_text(
-                    reply_token,
-                    "体育の振り返りですね。\n"
-                    "振り返りフォームのリンクを貼っておきます。\n\n"
-                    "https://docs.google.com/forms/d/e/"
-                    "1FAIpQLSfNBb_jKqbdbuzntPDCN8WSjhrilIGmyYuCOa8U4rZ2wcMkDA/"
-                    "viewform",
-                )
-
             elif command == "トークン":
                 reply_text(
                     reply_token,
                     "https://console.groq.com/home"
-                )
-
-            elif command == "貴方と会話がしたい":
-                keyboard_image_url = os.environ[
-                    "KEYBOARD_IMAGE_URL"
-                ]
-
-                reply_to_line(
-                    reply_token,
-                    [
-                        {
-                            "type": "image",
-                            "originalContentUrl":
-                                keyboard_image_url,
-                            "previewImageUrl":
-                                keyboard_image_url,
-                        },
-                        {
-                            "type": "image",
-                            "originalContentUrl":
-                                KAIWA_GA_SHITAI,
-                            "previewImageUrl":
-                                KAIWA_GA_SHITAI,
-                        },
-                        {
-                            "type": "text",
-                            "text":
-                                "これで私と会話できますよ。",
-                        },
-                    ],
-                )
-
-            elif command == "貴方は誰":
-                reply_text(
-                    reply_token,
-                    "私はF先生です。",
                 )
 
             else:
