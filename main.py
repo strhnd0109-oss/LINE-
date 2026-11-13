@@ -52,7 +52,6 @@ MAX_HISTORY_MESSAGES = 10
 
 FIXED_KEYWORDS = {
     "4STEP確認",
-    "時間割確認",
     "暗唱例文確認",
     "古文単語確認",
     "LEAP確認",
