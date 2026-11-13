@@ -500,6 +500,9 @@ def callback():
                 user_message
             )
 
+            if command in FIXED_KEYWORDS:
+                continue
+
             if command == "9":
                 reply_image(
                     reply_token,
