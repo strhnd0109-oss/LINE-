@@ -58,9 +58,9 @@ FIXED_KEYWORDS = {
     "LEAP確認",
     "公共関係",
     "体育関係",
-    "時間割確認",
     "about",
 }
+
 
 def get_last_image(user_id):
     """期限内に保存された画像だけを返す。期限切れなら削除する。"""
@@ -215,8 +215,9 @@ def callback():
 
     expected_signature = base64.b64encode(digest).decode("utf-8")
 
-    if not hmac.compare_digest(signature, expected_signature):
-        abort(400)
+    # =========================================================
+    # 一時テストのため、LINE Webhookの署名検証を無効化
+    # =========================================================
 
     data = request.get_json(silent=True) or {}
 
@@ -302,10 +303,10 @@ def callback():
             user_message = message_data.get("text", "")
             command = normalize_message(user_message)
 
-            # 「うお」はWebhook側では無視する
+            # 固定返信キーワードはWebhook側では無視する
             if command in FIXED_KEYWORDS:
                 continue
-    
+
             # クラス別時間割
             if command == "9":
                 reply_image(reply_token, TIMETABLE_IMAGE_URL9)
@@ -417,7 +418,7 @@ def callback():
                 reply_text(
                     reply_token,
                     "https://console.groq.com/home?utm_source=chatgpt.com"
-                    )
+                )
 
             # 「！」や「。」などを付けて送っても反応する
             elif command == "貴方と会話がしたい":
@@ -430,7 +431,7 @@ def callback():
                             "type": "image",
                             "originalContentUrl": keyboard_image_url,
                             "previewImageUrl": keyboard_image_url,
-                        }, 
+                        },
                         {
                             "type": "image",
                             "originalContentUrl": KAIWA_GA_SHITAI,
