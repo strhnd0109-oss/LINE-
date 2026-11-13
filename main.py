@@ -51,11 +51,15 @@ LAST_IMAGES = {}
 IMAGE_MEMORY_SECONDS = 600
 
 FIXED_KEYWORDS = {
-    "うお",
-    "時間割",
-    "日程を見せて",
-    "公共の諸々を見せて",
-    "体育の振り返りがしたい",
+    "4STEP確認",
+    "時間割確認",
+    "暗唱例文確認",
+    "古文単語確認",
+    "LEAP確認",
+    "公共関係",
+    "体育関係",
+    "時間割確認",
+    "about",
 }
 
 def get_last_image(user_id):
