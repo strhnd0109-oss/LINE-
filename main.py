@@ -641,7 +641,7 @@ def callback():
                     TIMETABLE_IMAGE_URL5
                 )
 
-            elif command == "日程":
+            elif command == "時間割確認":
                 reply_text(
                     reply_token,
                     get_schedule_message()
