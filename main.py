@@ -94,6 +94,7 @@ FIXED_KEYWORDS = {
     "あおいちゃん",
     "しょぼすぎ",
     "ショボすぎ",
+    "tab",
 }
 
 
@@ -983,26 +984,8 @@ def handle_fixed_message(
             [
                 "トルーパーソリュートですね。",
                 "こちらです。",
-                "https://open.spotify.com/"
+                "https://open.spotify.com/playlist/4rQLiqvg9PeY6vBPz3xs52?si=tPXCON0UTIy4Ibk5PZJTZQ&utm_source=copy-link&pi=hyd9u0lxSQiQg"
             ]
-        )
-
-        return True
-
-    if message == "公共の諸々を見せて":
-
-        reply_line(
-            reply_token,
-            "公共関係の資料です。"
-        )
-
-        return True
-
-    if message == "体育の振り返りがしたい":
-
-        reply_line(
-            reply_token,
-            "体育の振り返りフォームです。"
         )
 
         return True
