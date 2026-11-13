@@ -4,6 +4,8 @@ import hashlib
 import base64
 import random
 import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 from flask import Flask, request, abort
@@ -64,6 +66,94 @@ FIXED_KEYWORDS = {
     "菜穂子",
     "4ステップテスト",
     "どんどんいきます",
+}
+
+
+SCHEDULE_WEEKS = {
+    "2026-10-01": "B",
+    "2026-10-02": "B",
+    "2026-10-05": "A",
+    "2026-10-06": "A",
+    "2026-10-07": "A",
+    "2026-10-08": "A",
+    "2026-10-09": "A",
+    "2026-10-10": "A",
+    "2026-10-19": "A",
+    "2026-10-20": "A",
+    "2026-10-21": "A",
+    "2026-10-22": "A",
+    "2026-10-23": "A",
+    "2026-10-26": "B",
+    "2026-10-27": "B",
+    "2026-10-28": "B",
+    "2026-10-29": "B",
+    "2026-10-30": "B",
+    "2026-10-31": "A",
+
+    "2026-11-02": "A",
+    "2026-11-04": "A",
+    "2026-11-05": "A",
+    "2026-11-06": "A",
+    "2026-11-07": "A",
+    "2026-11-09": "B",
+    "2026-11-10": "B",
+    "2026-11-11": "B",
+    "2026-11-12": "B",
+    "2026-11-13": "B",
+    "2026-11-17": "A",
+    "2026-11-18": "A",
+    "2026-11-19": "A",
+    "2026-11-20": "A",
+    "2026-11-24": "B",
+    "2026-11-25": "B",
+    "2026-11-26": "B",
+    "2026-11-27": "B",
+    "2026-11-28": "A",
+    "2026-11-30": "A",
+
+    "2026-12-01": "A",
+    "2026-12-02": "A",
+    "2026-12-03": "A",
+    "2026-12-04": "A",
+    "2026-12-07": "A",
+    "2026-12-08": "A",
+
+    "2027-01-06": "B",
+    "2027-01-07": "B",
+    "2027-01-08": "B",
+    "2027-01-09": "A",
+    "2027-01-12": "A",
+    "2027-01-13": "A",
+    "2027-01-14": "A",
+    "2027-01-15": "A",
+    "2027-01-18": "B",
+    "2027-01-19": "B",
+    "2027-01-20": "B",
+    "2027-01-21": "B",
+    "2027-01-22": "B",
+    "2027-01-23": "A",
+    "2027-01-26": "A",
+    "2027-01-27": "A",
+    "2027-01-28": "A",
+    "2027-01-29": "A",
+    "2027-01-30": "A",
+
+    "2027-02-02": "B",
+    "2027-02-03": "B",
+    "2027-02-04": "B",
+    "2027-02-05": "B",
+    "2027-02-08": "B",
+    "2027-02-09": "B",
+    "2027-02-10": "B",
+    "2027-02-12": "B",
+    "2027-02-13": "A",
+    "2027-02-15": "A",
+    "2027-02-16": "A",
+    "2027-02-17": "A",
+    "2027-02-18": "A",
+    "2027-02-19": "A",
+    "2027-02-22": "A",
+    "2027-02-24": "A",
 }
 
 
@@ -208,6 +298,36 @@ def cleanup_expired_images():
 
     for user_id in expired_users:
         LAST_IMAGES.pop(user_id, None)
+
+
+def get_schedule_message():
+    today = datetime.now(
+        ZoneInfo("Asia/Tokyo")
+    ).date()
+
+    tomorrow = today + timedelta(days=1)
+
+    today_week = SCHEDULE_WEEKS.get(
+        today.isoformat()
+    )
+
+    tomorrow_week = SCHEDULE_WEEKS.get(
+        tomorrow.isoformat()
+    )
+
+    today_text = (
+        f"今日は{today_week}週です。"
+        if today_week
+        else "今日はA/Bの指定がありません。"
+    )
+
+    tomorrow_text = (
+        f"明日は{tomorrow_week}週です。"
+        if tomorrow_week
+        else "明日はA/Bの指定がありません。"
+    )
+
+    return today_text + "\n" + tomorrow_text
 
 
 def ask_groq(user_id, message):
@@ -519,6 +639,12 @@ def callback():
                 reply_image(
                     reply_token,
                     TIMETABLE_IMAGE_URL5
+                )
+
+            elif command == "日程":
+                reply_text(
+                    reply_token,
+                    get_schedule_message()
                 )
 
             elif command == "日程を見せて":
