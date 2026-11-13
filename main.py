@@ -30,12 +30,10 @@ client = Groq(api_key=GROQ_API_KEY)
 
 
 CONVERSATION_HISTORY = {}
-
 MAX_HISTORY_MESSAGES = 10
 
 
 LAST_IMAGES = {}
-
 IMAGE_MEMORY_SECONDS = 600
 
 
@@ -55,6 +53,7 @@ FIXED_KEYWORDS = {
 SCHEDULE_WEEKS = {
     "2026-10-01": "B",
     "2026-10-02": "B",
+
     "2026-10-05": "A",
     "2026-10-06": "A",
     "2026-10-07": "A",
@@ -211,9 +210,7 @@ y = 2x + 1
 
 などは注意してください。
 
-必要だと判断した場合は、必ずWeb検索を利用してください。
-
-Web検索を利用して得られた情報と、あなた自身の知識を混同しないでください。
+必要だと判断した場合は、Browser Searchを利用してください。
 
 検索しても確認できない場合は、
 「確認できませんでした」
@@ -222,10 +219,8 @@ Web検索を利用して得られた情報と、あなた自身の知識を混�
 
 存在しない人物名や設定を、それらしい名前で捏造してはいけません。
 
-【Web検索】
-GroqのBrowser Searchが利用できます。
-
-以下のような場合は積極的に検索してください。
+【検索】
+検索機能が利用できる場合は、以下のような場合に積極的に利用してください。
 
 ・最新情報
 ・ニュース
@@ -237,7 +232,7 @@ GroqのBrowser Searchが利用できます。
 ・ゲームやアニメの細かい設定
 ・ユーザーが「調べて」「検索して」「最新では？」などと聞いた場合
 
-一方で、一般的な数学問題や日常会話など、検索する必要がないものまで無理に検索しないでください。
+一般的な数学問題や日常会話など、検索する必要がないものまで無理に検索しないでください。
 
 【ユーザー名】
 ユーザーのLINE表示名が与えられる場合があります。
@@ -247,7 +242,6 @@ GroqのBrowser Searchが利用できます。
 のように自然に呼びかけてください。
 
 ただし、毎回名前を呼ぶ必要はありません。
-不自然な場合は名前を使わないでください。
 
 LINE表示名は必ずしも本名とは限りません。
 表示名から本名などを推測してはいけません。
@@ -303,8 +297,17 @@ def get_line_display_name(user_id):
         )
 
         if not response.ok:
-            print("PROFILE API STATUS:", response.status_code)
-            print("PROFILE API RESPONSE:", response.text)
+
+            print(
+                "PROFILE API STATUS:",
+                response.status_code
+            )
+
+            print(
+                "PROFILE API RESPONSE:",
+                response.text
+            )
+
             return None
 
         data = response.json()
@@ -424,7 +427,10 @@ def reply_line(reply_token, messages):
         timeout=10
     )
 
-    print("LINE REPLY:", response.status_code)
+    print(
+        "LINE REPLY:",
+        response.status_code
+    )
 
     if not response.ok:
         print(response.text)
@@ -466,7 +472,10 @@ def reply_image(reply_token, image_url):
         timeout=10
     )
 
-    print("LINE IMAGE REPLY:", response.status_code)
+    print(
+        "LINE IMAGE REPLY:",
+        response.status_code
+    )
 
     if not response.ok:
         print(response.text)
@@ -506,7 +515,10 @@ def push_line(user_id, messages):
         timeout=10
     )
 
-    print("LINE PUSH:", response.status_code)
+    print(
+        "LINE PUSH:",
+        response.status_code
+    )
 
     if not response.ok:
         print(response.text)
@@ -514,7 +526,10 @@ def push_line(user_id, messages):
 
 def get_line_image(message_id):
 
-    url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"
+    url = (
+        f"https://api-data.line.me/"
+        f"v2/bot/message/{message_id}/content"
+    )
 
     headers = {
         "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
@@ -599,7 +614,11 @@ def ask_groq(user_id, user_message):
         answer = response.choices[0].message.content
 
         if not answer:
-            answer = "すみません、うまく回答を生成できませんでした。"
+
+            answer = (
+                "すみません、うまく回答を"
+                "生成できませんでした。"
+            )
 
         answer = remove_latex(answer)
 
@@ -621,7 +640,10 @@ def ask_groq(user_id, user_message):
 
         error_text = str(e)
 
-        print("GROQ ERROR:", error_text)
+        print(
+            "GROQ ERROR:",
+            error_text
+        )
 
         if (
             "429" in error_text
@@ -659,7 +681,10 @@ def ask_groq_with_image(
     display_name = get_line_display_name(user_id)
 
     if not user_message:
-        user_message = "この画像について説明してください。"
+
+        user_message = (
+            "この画像について説明してください。"
+        )
 
     image_base64 = base64.b64encode(
         image_bytes
@@ -685,7 +710,8 @@ def ask_groq_with_image(
             "content": (
                 "【現在のユーザー情報】\n"
                 f"LINE表示名：{display_name}\n"
-                f"必要な場合は「{display_name}さん」と自然に呼びかけてください。"
+                f"必要な場合は「{display_name}さん」と"
+                "自然に呼びかけてください。"
             )
         })
 
@@ -720,7 +746,10 @@ def ask_groq_with_image(
         answer = response.choices[0].message.content
 
         if not answer:
-            answer = "画像をうまく読み取れませんでした。"
+
+            answer = (
+                "画像をうまく読み取れませんでした。"
+            )
 
         answer = remove_latex(answer)
 
@@ -746,7 +775,10 @@ def ask_groq_with_image(
 
     except Exception as e:
 
-        print("IMAGE GROQ ERROR:", e)
+        print(
+            "IMAGE GROQ ERROR:",
+            e
+        )
 
         return (
             "画像を読み取っている途中で"
@@ -761,7 +793,10 @@ def get_last_image(user_id):
 
     image_info = LAST_IMAGES[user_id]
 
-    elapsed = time.time() - image_info["timestamp"]
+    elapsed = (
+        time.time()
+        - image_info["timestamp"]
+    )
 
     if elapsed > IMAGE_MEMORY_SECONDS:
 
@@ -775,10 +810,14 @@ def get_last_image(user_id):
 def get_schedule_message():
 
     today = now_jst().date()
+
     tomorrow = today + timedelta(days=1)
 
     today_key = today.strftime("%Y-%m-%d")
-    tomorrow_key = tomorrow.strftime("%Y-%m-%d")
+
+    tomorrow_key = tomorrow.strftime(
+        "%Y-%m-%d"
+    )
 
     today_week = SCHEDULE_WEEKS.get(
         today_key,
@@ -887,8 +926,10 @@ def handle_fixed_message(
 
         reply_line(
             reply_token,
-            "Groqのコンソールはこちらです。\n"
-            "https://console.groq.com/"
+            (
+                "Groqのコンソールはこちらです。\n"
+                "https://console.groq.com/"
+            )
         )
 
         return True
@@ -966,7 +1007,9 @@ def home():
 )
 def callback():
 
-    body = request.get_data(as_text=True)
+    body = request.get_data(
+        as_text=True
+    )
 
     signature = request.headers.get(
         "X-Line-Signature",
@@ -988,13 +1031,20 @@ def callback():
             expected_signature
         ):
 
-            print("WARNING: LINE signature mismatch")
+            print(
+                "WARNING: LINE signature mismatch"
+            )
 
     try:
 
         data = request.get_json()
 
-    except Exception:
+    except Exception as e:
+
+        print(
+            "JSON ERROR:",
+            e
+        )
 
         return "OK"
 
@@ -1008,7 +1058,9 @@ def callback():
 
     for event in events:
 
-        event_type = event.get("type")
+        event_type = event.get(
+            "type"
+        )
 
         if event_type != "message":
             continue
@@ -1101,25 +1153,4 @@ def callback():
 
                 continue
 
-            image_bytes, content_type = get_line_image(
-                message_id
-            )
-
-            if not image_bytes:
-
-                reply_line(
-                    reply_token,
-                    "画像を取得できませんでした。"
-                )
-
-                continue
-
-            LAST_IMAGES[user_id] = {
-                "image": image_bytes,
-                "content_type": content_type,
-                "timestamp": time.time()
-            }
-
-            answer = ask_groq_with_image(
-                user_id,
-             
+        
