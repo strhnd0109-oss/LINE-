@@ -96,7 +96,6 @@ FIXED_KEYWORDS = {
     "ショボすぎ",
     "tab",
     "about",
-    "時間割確認",
     "公共関係",
     "体育関係",
     "LEAP確認",
@@ -1047,12 +1046,6 @@ def handle_fixed_message(
         return True
 
     if message in FIXED_KEYWORDS:
-
-        reply_line(
-            reply_token,
-            "この項目は固定処理になっています。"
-        )
-
         return True
 
     return False
