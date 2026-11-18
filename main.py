@@ -1213,7 +1213,6 @@ def callback():
             )
 
         elif message_type == "image":
-
             message_id = message_data.get(
                 "id"
             )
@@ -1227,4 +1226,26 @@ def callback():
 
                 continue
 
-        
+            image_bytes, content_type = get_line_image(
+                message_id
+            )
+
+            if not image_bytes:
+
+                reply_line(
+                    reply_token,
+                    "画像を取得できませんでした。"
+                )
+
+                continue
+
+            answer = ask_groq_with_image(
+                user_id,
+                image_bytes,
+                content_type
+            )
+
+            reply_line(
+                reply_token,
+                answer
+            )
